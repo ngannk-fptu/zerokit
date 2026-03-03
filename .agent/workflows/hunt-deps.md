@@ -1,9 +1,10 @@
 ---
-description: Dependency & Reachability Workflow. Finds reachable CVEs in project dependencies.
+description: Specialized subflow for dependency risk and reachability analysis.
 ---
 
-1. Execute a dependency scan using `Trivy` or `Gitleaks` to identify known CVEs in the project's manifests (e.g., `package.json`, `composer.json`, `requirements.txt`).
-2. Map the **Attack Surface** of the project to identify all external entry points.
-3. Perform **Reachability Analysis**: Determine if the project's code actually calls the vulnerable functions within the flagged dependencies.
-4. Filter out "Dormant" vulnerabilities that are not reachable from the attack surface.
-5. Report only those CVEs that pose a real, reachable risk to the application.
+1. Start from `workflows/master-harness.md` and complete Phase 01-02 first.
+2. Inventory direct and transitive dependencies from lock/manifests.
+3. Match dependencies against known vulnerability intelligence (CVE/CWE advisories).
+4. Perform reachability analysis from exposed attack surface to vulnerable package code paths.
+5. Promote only reachable, exploitable candidates into Phase 03 findings.
+6. Continue through verification and reporting using master workflow phases.

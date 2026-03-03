@@ -1,7 +1,7 @@
 ---
-description: Run the Hunt Taint analysis
+description: Deprecated compatibility alias for old taint scripts.
 ---
 
-1. Check if `hunt_taint.py` or `scripts/hunt_taint.py` exists in the workspace.
-2. If found, run the taint analysis using the python executable.
-3. If not found, notify the user that the custom `hunt-taint` scripts are missing from this workspace (`d:\WLD\SSI\research\1\trilm\ZeroKit2`).
+1. Do not reference external hardcoded script paths.
+2. Route to `workflows/master-harness.md`.
+3. Perform taint-style analysis within Phase 03 (`workflows/phases/phase-03-threat-and-static.md`) using available local tools.

@@ -1,0 +1,40 @@
+# Agent Harness Scope Lock
+
+## Mission
+Build an AI agent harness specialized for whitebox source-code pentesting.
+
+## Primary Language Targets
+- .NET / C#
+- TypeScript / JavaScript
+- Java
+- Go
+- Python
+
+## Secondary Language Targets
+- PHP
+- C/C++
+- Other languages only when directly needed for reachable findings
+
+## Canonical Workflow Surface
+- `workflows/master-harness.md`
+- `workflows/phases/phase-01-intake-plan.md` ... `phase-06-report-regression.md`
+
+## Hard Rules
+1. No proof, no vulnerability.
+2. Every reported issue must include reproducible evidence.
+3. Every confirmed issue must include root cause and remediation guidance.
+4. Prefer source-code reachability and exploitability over scanner noise.
+
+## In Scope
+- Attack surface mapping
+- Threat modeling
+- Static detection and finding normalization
+- Verification gate (PoC/runtime evidence)
+- Variant analysis
+- Patch verification
+- Reporting and regression guidance
+
+## Out of Scope
+- Generic productivity or design workflows
+- Unrelated blockchain/mobile scanners for this harness baseline
+- Legacy external-path workflows and hardcoded environment references
