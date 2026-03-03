@@ -197,7 +197,7 @@
 ## Next Steps
 
 1. **Install Core Tools**: CodeQL, Joern, AFL++
-2. **Create Wrappers**: `CodeQLRunner`, `JoernRunner`, `FuzzerRunner` in `.agent/pipeline/tools/`
+2. **Create Wrappers**: `CodeQLRunner`, `JoernRunner`, `FuzzerRunner` as reusable skill scripts under `.agent/skills/<tool-skill>/scripts/`
 3. **Implement Adapters**: Java (Maven/Gradle), JavaScript (npm), C++ (CMake)
 4. **Sanitizer Integration**: Update `Verifier` to compile targets with `-fsanitize=address,undefined`
 5. **Testing**: Validate on OWASP Benchmark or deliberately vulnerable apps

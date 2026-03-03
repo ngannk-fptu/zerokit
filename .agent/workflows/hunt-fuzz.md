@@ -1,14 +1,12 @@
 ---
-description: Fuzzing Orchestration Workflow. Generates harnesses and fuzzes parsers.
+description: Specialized subflow for fuzzing-focused verification.
 ---
 
-1. Use `AdapterLoader` to detect the project tech stack (Python, Java, PHP, C/C++).
-2. Identify high-risk "Sinks" (parsers, deserialization points, network handlers) using `grep_search`.
-3. Invoke Antigravity (Prompter) to generate a fuzzing harness specifically for the detected language:
-   - Python: Atheris
-   - Java: Jazzer
-   - C/C++: AFL++ / LibFuzzer
-4. Deploy the harness to `storage/workspaces/fuzz_workspace`.
-5. Run the fuzzer via the appropriate runner in `core/tools/`.
-6. Monitor for crashes and unique hangs.
-7. If a crash is found, trigger the **Root Cause Analysis (RCA)** phase and generate a `VerifiedVuln`.
+1. Start from `workflows/master-harness.md` and complete Phase 01-03 first.
+2. During Phase 04, prioritize fuzzing for parser/deserialization/input-heavy sinks.
+3. Select fuzzer approach by language:
+- .NET/Java: JVM/.NET-compatible fuzz strategies
+- TypeScript/JavaScript: parser and serialization input fuzzing
+- Go/Python/C/C++: native or harness-based fuzzing
+4. Capture crashes, hangs, and minimized repro inputs as verification evidence.
+5. Continue with Phase 05 and Phase 06 from the master workflow.

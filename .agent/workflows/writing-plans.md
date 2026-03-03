@@ -1,6 +1,7 @@
 ---
-description: Create detailed implementation plans
+description: Deprecated compatibility alias.
 ---
 
-1. Read the writing-plans skill instructions at `.agent/skills/superpowers/writing-plans/SKILL.md`.
-2. Follow the instructions to create a detailed implementation plan.
+1. Do not use legacy external planning skills here.
+2. Route to `workflows/master-harness.md`.
+3. Use Phase 01 (`workflows/phases/phase-01-intake-plan.md`) as the canonical planning flow.

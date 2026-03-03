@@ -1,10 +1,10 @@
 ---
-description: Patch-Diff Hunting Workflow. Finds silent security fixes and generates PoCs for the pre-fix version.
+description: Specialized subflow for patch-diff and silent-fix analysis.
 ---
 
-1. Analyze the project's git history to identify "Silent Fixes" (commits that look like bug fixes but might be security-related).
-2. For each suspicious commit, perform a **Differential Review** of the code changes.
-3. Use the `variant-analysis` skill to extract the underlying vulnerability pattern.
-4. Attempt to generate a Proof-of-Concept (PoC) that triggers the vulnerability in the **pre-patch** version of the code.
-5. Verify if similar patterns exist in other parts of the current codebase that remain unpatched.
-6. Report findings as "Silent Patch Regressions" or "Unpatched Variants".
+1. Start from `workflows/master-harness.md` and complete Phase 01 first.
+2. Identify security-relevant historical diffs and suspicious silent fixes.
+3. Extract vulnerable pattern from pre-fix and post-fix deltas.
+4. Validate exploitability of pre-fix behavior where feasible.
+5. Run variant search against current codebase for unfixed sibling patterns.
+6. Route validated findings through master Phase 04-06 gates.
