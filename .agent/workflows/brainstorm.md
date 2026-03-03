@@ -1,6 +1,7 @@
 ---
-description: Run the brainstorming skill to explore ideas and designs
+description: Deprecated compatibility alias.
 ---
 
-1. Read the brainstorming skill instructions at `.agent/skills/superpowers/brainstorming/SKILL.md`.
-2. Follow the instructions to conduct a brainstorming session.
+1. Do not use this workflow for harness execution.
+2. Route to `workflows/master-harness.md`.
+3. If brainstorming is needed, perform it inside Phase 01 intake/planning and keep outputs tied to harness tasks.

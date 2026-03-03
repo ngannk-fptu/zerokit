@@ -182,7 +182,7 @@ wget https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_wind
 ### 2. Configuration Files
 
 #### Option A: Provide Tool Paths
-Create `d:/WLD/SSI/research/1/trilm/ZeroKit2/.agent/pipeline/config.py`:
+Create a local harness config module (for example `.agent/knowledge_base/local_config_example.py`) or use environment variables:
 
 ```python
 TOOL_PATHS = {
@@ -208,7 +208,7 @@ Do you want me to:
 ### 4. Harness Templates
 
 Should I:
-- Copy harness templates from `learn.md` (lines 850-937) into `.agent/pipeline/templates/`?
+- Copy harness templates from `learn.md` (lines 850-937) into `.agent/knowledge_base/templates/`?
 - Implement `Verifier._generate_harness()` to use these templates?
 
 ---
