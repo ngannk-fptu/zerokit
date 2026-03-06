@@ -1,0 +1,23 @@
+rules:
+  - id: test-unsafe-prepare
+    languages: [php]
+    message: "CRITICAL: Unsafe wpdb->prepare usage"
+    severity: ERROR
+    pattern-either:
+      - pattern: $WPDB->prepare("..." . $VAR, ...)
+      - pattern: $WPDB->query($WPDB->prepare("..." . $VAR, ...))
+      - pattern: $WPDB->get_results($WPDB->prepare("..." . $VAR, ...))
+  
+  - id: test-xss
+    languages: [php]
+    message: "XSS: Unescaped echo"
+    severity: ERROR
+    patterns:
+      - pattern: echo $VAR;
+      - pattern-not-inside: esc_html(...)
+      
+  - id: test-rce
+    languages: [php]
+    message: "RCE: Direct system call"
+    severity: ERROR
+    pattern: system($VAR)

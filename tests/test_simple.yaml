@@ -1,0 +1,21 @@
+rules:
+  - id: test-prepare-simple
+    languages:
+      - php
+    message: "Found prepare call"
+    severity: WARNING
+    pattern: $WPDB->prepare(...)
+    
+  - id: test-concat
+    languages:
+      - php
+    message: "Found string concatenation"
+    severity: WARNING
+    pattern: '"..." . $X'
+    
+  - id: test-system
+    languages:
+      - php
+    message: "Found system call"
+    severity: ERROR
+    pattern: system(...)
