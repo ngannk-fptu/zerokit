@@ -43,12 +43,16 @@ class ThreatModeler:
                         graph_summary = "No obvious direct paths to sinks found in call graph."
 
                 # Call LLM with enriched context
+                # OPTIMIZATION: Only pass the relevant language skill to prevent context explosion
+                lang = security_profile.language if security_profile else "Unknown"
+                lang_skill_ref = f"@[skills/{lang}-security-patterns]" if lang != "Unknown" else ""
+                
                 response = self.llm.generate_hypotheses(
                     filename=ep.code_location,
                     function_signature=ep.code_location,
                     route_info=ep.description or "Internal Function",
-                    language=security_profile.language if security_profile else "Unknown",
-                    security_profile=security_profile.json() if security_profile else "{}",
+                    language=lang,
+                    security_profile=f"{security_profile.json() if security_profile else '{}'}\nRelevant Patterns: {lang_skill_ref}",
                     code_graph_summary=graph_summary
                 )
                 
