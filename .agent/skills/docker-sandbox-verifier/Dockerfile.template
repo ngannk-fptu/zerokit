@@ -1,0 +1,31 @@
+﻿# =============================================================================
+# ZeroKit Docker Sandbox  Universal Dockerfile Template
+# =============================================================================
+# Variables to replace before use (agent fills these in based on detected stack):
+#
+#   {{BASE_IMAGE}}       Docker base image (see SKILL.md stack table)
+#   {{SYSTEM_DEPS}}      apt-get / apk packages to install (or "# none")
+#   {{RUNTIME_DEPS}}     language-level deps (pip install / npm install / etc.)
+#   {{POC_FILE}}         PoC filename to copy (repro.py / repro.js / repro.go )
+#   {{BUILD_STEP}}       Optional compile step (or "# none")
+#   {{RUN_CMD}}          Final command to execute PoC
+# =============================================================================
+
+FROM {{BASE_IMAGE}}
+
+WORKDIR /app
+
+# -- System dependencies --
+RUN {{SYSTEM_DEPS}}
+
+# -- Runtime / language dependencies --
+RUN {{RUNTIME_DEPS}}
+
+# -- Copy PoC script --
+COPY {{POC_FILE}} .
+
+# -- Optional build step (compile languages) --
+{{BUILD_STEP}}
+
+# -- Execute PoC (exit 0 = exploit confirmed) --
+CMD {{RUN_CMD}}
