@@ -1,111 +1,76 @@
-# ZeroKit2 🛡️
+# ZeroKit V3
 
-> **Autonomous Security Research Pipeline**
-> *Hypothesize. Verify. Patch.*
+ZeroKit V3 is a plug-and-play skill and knowledge layer that turns any
+capable AI agent into a professional whitebox pentester.
 
-ZeroKit2 is an agentic framework that maps codebases, constructs security hypotheses, verifies them with dynamic exploits, and patches them automatically.
+Drop this repo into Claude Code, Codex, GitHub Copilot, Antigravity, or
+any agent runtime that can read files and run shell commands. The agent
+gets structured pentesting methodology, tool connectors, artifact
+contracts, and domain knowledge. It provides the reasoning, context,
+and judgment -- like a human security researcher.
 
----
+## How It Works
 
-## 🚀 Key Features (v5.0)
+ZeroKit is **not** an automated scan chain. The agent decides what to
+do at each phase. Scripts are narrow tool executors the agent calls.
 
-*   **🧠 Thinking Agents**: Powered by **Google Gemini Pro** via a smart LLM Gateway.
-*   **🏭 4-Stage Pipeline**: Map -> Threat Model -> Detect -> Verify.
-*   **⚡ Prompt Externalization**: Prompts managed as `.md` files with Hot-Reload.
-*   **🛡️ Deep Logic Hunting**: Antigravity (Intelligent Worker API) analyzes code metadata to find IDOR, Access Control, and Business Logic flaws.
-*   **✅ Auto-Verification**: Writes & executes Python PoCs to **prove** bugs (No Proof = No Report).
-*   **🔧 Auto-Patching**: Generates diffs to fix verified vulnerabilities.
-
-## 🏗️ Architecture
-
-The system uses a **Factory Line** architecture where intelligent agents collaborate:
-
-1.  **Repo Profiler**: Maps the attack surface.
-2.  **Threat Modeler**: "Thinks" about potential risks (`analyze_risk`).
-3.  **Detector**: Writes dynamic Semgrep rules (`generate_rule`).
-4.  **Verifier**: Writes & Runs Exploits (`generate_poc`).
-5.  **Patcher**: Fixes the code (`generate_patch`).
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
-
-## 📂 Workspace Navigator
-
-This repository is structured as follows to facilitate security research and tool development:
-
-### 🔬 Research & Audits
-- `Piranha-XSS-Audit/`: Dedicated folder for the Piranha CMS research.
-    - `analysis/`: Contains `hunt-pipeline-analysis.md` and Semgrep results.
-    - `planning/`: Roadmap and implementation plans for the audit.
-    - `scripts/`: Finalized exploit scripts for the Piranha CMS.
-- `bpost-shipping-platform/`: Security research related to the bpost shipping platform.
-
-### 🧪 Proof of Concepts & Labs
-- `test_vul/`: The active "Vulnerability Lab".
-    - `piranha_lab/`: A local environment for testing Piranha vulnerabilities.
-    - `repro_*.py`: Iterative reproduction scripts (use `repro_piranha_xss.py` for the final exploit).
-- `piranha.core/`: Source code of the target CMS (Piranha CMS v10.x).
-
-### 🛠️ ZeroKit2 Core Engine
-- `core/`: Primary logic for the agentic pipeline (Orchestrator, Agents).
-- `adapters/`: Adapters for external tools (Semgrep, LLMs, Docker).
-- `SecOpsAgentKit/`: Internal library for security agent behaviors.
-- `storage/`: Persistent storage for scan results, logs, and artifacts.
-
-### 📜 Utilities
-- `scripts/`: General-purpose automation scripts (e.g., `mass_hunt.py`, `download.py`).
-- `tests/`: Unit and integration tests for the ZeroKit2 framework.
-
----
-
-
-## 📦 Installation
-
-```bash
-# Clone
-git clone https://github.com/your-org/zerokit2
-cd zerokit2
-
-# Install Deps
-pip install -r requirements.txt
-
-# Configure .env
-cp .env.example .env
-# Edit .env with your Google Gemini API Key
+```
+Agent runtime (Claude Code, Codex, Copilot, etc.)
+       |
+       | reads workflows, skills, prompts
+       | invokes tool wrappers (Semgrep, Gitleaks, Joern, Docker)
+       | produces and validates artifacts
+       v
+ZeroKit harness layer
+  .agent/workflows/    -- methodology (6-phase pentest flow)
+  .agent/skills/       -- 30 pentest skill packs
+  .agent/knowledge_base/ -- prompts, templates, references
+  .agent/artifacts/    -- contracts, schemas, examples
+  tools/harness/       -- tool connectors, profilers, validators
+  tools/ci/            -- CI guardrails
 ```
 
-## 🎯 Usage
+## 6-Phase Workflow
 
-### Option 1: Antigravity Integration (Recommended)
+`Intake > Surface > Static > Verify > RCA > Report`
 
-Run the full pipeline with direct Antigravity integration:
+Each phase exchanges structured artifacts. The agent reads the phase
+doc, follows the methodology, uses the relevant skills and tools, and
+writes contract-aligned output before moving to the next phase.
 
-**Terminal 1: Start Antigravity Monitor**
-```bash
-python .agent/scripts/antigravity_monitor.py
-```
+## Entry Point
 
-**Terminal 2: Run Pipeline**
-```bash
-python hunt_pipeline.py <path_to_target>
-```
-
-The monitor will:
-- Watch for incoming prompts from agents
-- Display prompts for your review
-- Auto-execute routine tasks (like `fix_semgrep_rule`)
-- Request manual confirmation for critical tasks (like `generate_hypotheses`, `generate_patch`)
-- Write responses back to the pipeline
-
-### Option 2: External API Mode
-
-If you prefer using Gemini API directly:
-
-1. Set `LLM_PROVIDER=gemini` in `.env`
-2. Add your `GOOGLE_API_KEY`
-3. Run: `python hunt_pipeline.py <path_to_target>`
-
-### Testing the Threat Modeler
+Scaffold a run directory (simulated artifacts for now):
 
 ```bash
-python tests/pipeline/test_threat_modeler_llm.py
+python tools/harness/run_master_workflow.py --target <repo>
 ```
+
+For real pentesting, the agent follows `.agent/workflows/master-harness.md`
+directly and uses the tool wrappers in each phase.
+
+## What the Agent Gets
+
+| Layer | Contents |
+|---|---|
+| Methodology | 6 phase workflow docs with step-by-step guidance |
+| Skills | Semgrep SAST, Gitleaks secrets, threat modeling, fuzzing, variant analysis, 25+ more |
+| Tool connectors | Semgrep, Gitleaks, Joern (CPG/taint), Docker (PoC sandbox), CodeQL |
+| Knowledge | CWE/OWASP references, language-specific security patterns, PoC templates, prompt templates |
+| Artifact contracts | JSON schemas for every phase handoff, enforced by CI |
+| Evidence gates | Hard rule: no proof, no vulnerability. Programmatically enforced. |
+
+## Target Languages
+.NET, TypeScript/JavaScript, Java, Go, Python
+
+## Setup
+```bash
+pip install -e ".[dev]"
+make test
+```
+
+## Hard Rules
+- No proof, no vulnerability.
+- Agent decides; scripts execute.
+- Artifact contracts are mandatory for phase handoff.
+- Portable across agent runtimes by design.
