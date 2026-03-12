@@ -1,7 +1,13 @@
 # Agent Harness Scope Lock
 
 ## Mission
-Build an AI agent harness specialized for whitebox source-code pentesting.
+Turn any capable AI agent into a professional whitebox pentester via
+plug-and-play skills, methodology, tool connectors, and evidence contracts.
+
+## Core Model
+The agent runtime (Claude Code, Codex, Copilot, Antigravity, etc.)
+provides reasoning. ZeroKit provides the pentest methodology and tools.
+Agent decides; scripts execute.
 
 ## Primary Language Targets
 - .NET / C#
@@ -24,6 +30,7 @@ Build an AI agent harness specialized for whitebox source-code pentesting.
 2. Every reported issue must include reproducible evidence.
 3. Every confirmed issue must include root cause and remediation guidance.
 4. Prefer source-code reachability and exploitability over scanner noise.
+5. Agent decides what to investigate and when. No autonomous scan chains.
 
 ## In Scope
 - Attack surface mapping
@@ -35,6 +42,7 @@ Build an AI agent harness specialized for whitebox source-code pentesting.
 - Reporting and regression guidance
 
 ## Out of Scope
+- Autonomous pipeline execution without agent judgment
+- Separate LLM gateway or API client (agent runtime handles reasoning)
 - Generic productivity or design workflows
 - Unrelated blockchain/mobile scanners for this harness baseline
-- Legacy external-path workflows and hardcoded environment references
