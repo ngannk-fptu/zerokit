@@ -25,6 +25,7 @@ bin/
 obj/
 **/bin/
 **/obj/
+.agent/artifacts/runs/
 
 # Local workspace files
 .claude/
@@ -34,3 +35,20 @@ obj/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+zerokit.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# Lock files (uv)
+uv.lock
+
+# Sisyphus planner
+.sisyphus/
