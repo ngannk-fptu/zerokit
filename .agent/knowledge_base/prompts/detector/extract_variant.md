@@ -4,10 +4,10 @@ agent: "detector"
 method: "extract_variant"
 description: "Extracts an abstract search pattern from a specific confirmed vulnerability"
 last_updated: "2026-02-09"
-author: "antigravity"
+author: "security-team"
 
 # LLM Configuration
-default_model: "gemini-1.5-pro"
+default_model: "baseline-model"
 temperature: 0.1
 max_tokens: 1024
 response_format: "json"

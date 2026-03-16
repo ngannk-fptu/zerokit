@@ -1,0 +1,16 @@
+{
+  "run_id": "example-run-001",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "items": [
+    {
+      "id": "sf-001",
+      "source": "orchestration-shim",
+      "tool": "semgrep",
+      "severity": "high",
+      "path": "src/api/users.ts",
+      "line": 42,
+      "evidence": "pattern matched unsafe render path",
+      "hypothesis_id": "hyp-001"
+    }
+  ]
+}

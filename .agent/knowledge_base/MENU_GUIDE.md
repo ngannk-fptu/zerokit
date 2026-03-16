@@ -26,4 +26,4 @@ Treat `master-harness` as the single orchestration surface.
 These subflows must still obey the master verification gate and artifact contract.
 
 ## Compatibility Aliases
-Legacy files (`hunt-pipeline`, `brainstorm`, `writing-plans`, `hunt-taint`) are compatibility routing stubs and should not define independent orchestration logic.
+Legacy routing files (for example `brainstorm`, `writing-plans`, and `hunt-taint`) are compatibility stubs and should not define independent orchestration logic.

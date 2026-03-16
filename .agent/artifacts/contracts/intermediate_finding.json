@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "description": "Intermediate finding format emitted by tool connectors before merge",
+  "required_fields": ["run_id", "generated_at", "items"],
+  "item_required_fields": ["tool", "rule", "severity", "path", "line", "evidence", "cwe"]
+}

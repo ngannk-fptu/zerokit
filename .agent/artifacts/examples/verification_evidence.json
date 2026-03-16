@@ -1,0 +1,15 @@
+{
+  "run_id": "example-run-001",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "items": [
+    {
+      "finding_id": "sf-001",
+      "source": "orchestration-shim",
+      "status": "confirmed",
+      "command": "pytest tests/security/test_profile_xss.py::test_stored_xss",
+      "exit_code": 1,
+      "output_excerpt": "assert '<script>' in response.text",
+      "artifact_path": ".agent/artifacts/runs/example-run-001/04-verify/sf-001.log"
+    }
+  ]
+}

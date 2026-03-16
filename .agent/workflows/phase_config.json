@@ -1,0 +1,10 @@
+{
+  "phases": [
+    {"id": "01", "dir": "01-intake", "doc": "phase-01-intake-plan.md"},
+    {"id": "02", "dir": "02-surface", "doc": "phase-02-profile-surface.md"},
+    {"id": "03", "dir": "03-static", "doc": "phase-03-threat-and-static.md"},
+    {"id": "04", "dir": "04-verify", "doc": "phase-04-verification-gate.md"},
+    {"id": "05", "dir": "05-rca", "doc": "phase-05-rca-variant-patch.md"},
+    {"id": "06", "dir": "06-report", "doc": "phase-06-report-regression.md"}
+  ]
+}

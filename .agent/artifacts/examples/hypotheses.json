@@ -1,0 +1,15 @@
+{
+  "run_id": "example-run-001",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "items": [
+    {
+      "id": "hyp-001",
+      "title": "Stored XSS via profile bio",
+      "cwe": "CWE-79",
+      "source": "request.body.bio",
+      "sink": "renderProfileHtml",
+      "priority": "high",
+      "rationale": "User-controlled HTML rendered without encoding"
+    }
+  ]
+}

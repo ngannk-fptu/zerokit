@@ -1,4 +1,4 @@
-# OWASP A01–A10 Attack Patterns — Hunt-Pipeline Reference
+# OWASP A01-A10 Attack Patterns — Harness Reference
 
 Per-category attack patterns for generating Hypotheses during Phase 3.
 Each section maps to specific `VulnerabilityCategory` enum values and CWEs.

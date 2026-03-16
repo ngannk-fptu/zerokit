@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "supported_languages": ["dotnet", "typescript", "javascript", "java", "go", "python"],
+  "detector_outputs": {
+    "repository_profile": {
+      "required_fields": [
+        "run_id",
+        "generated_at",
+        "languages",
+        "frameworks",
+        "build_commands",
+        "test_commands",
+        "entrypoints",
+        "trust_boundaries",
+        "high_risk_sinks"
+      ]
+    }
+  },
+  "language_signals": {
+    "dotnet": ["*.sln", "*.csproj", "Program.cs", "*.fsproj"],
+    "typescript": ["tsconfig.json", "package.json", "*.ts", "*.tsx"],
+    "javascript": ["package.json", "*.js", "*.mjs", "*.cjs"],
+    "java": ["pom.xml", "build.gradle", "build.gradle.kts", "*.java"],
+    "go": ["go.mod", "go.sum", "*.go"],
+    "python": ["pyproject.toml", "requirements.txt", "setup.py", "*.py"]
+  }
+}

@@ -40,14 +40,9 @@ writes contract-aligned output before moving to the next phase.
 
 ## Entry Point
 
-Scaffold a run directory (simulated artifacts for now):
-
-```bash
-python tools/harness/run_master_workflow.py --target <repo>
-```
-
-For real pentesting, the agent follows `.agent/workflows/master-harness.md`
-directly and uses the tool wrappers in each phase.
+Point your agent runtime at this repo and read `.agent/agent.md`.
+That file contains the full methodology, commands, and decision logic
+the agent needs to run a whitebox pentest.
 
 ## What the Agent Gets
 

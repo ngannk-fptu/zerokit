@@ -1,0 +1,15 @@
+{
+  "run_id": "example-run-001",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "items": [
+    {
+      "finding_id": "sf-001",
+      "root_cause": "Missing output encoding in profile renderer",
+      "variant_query": "render*Html + user-controlled input",
+      "variant_hits": [
+        "src/api/admin.ts:88"
+      ],
+      "patch_guidance": "Encode user content with approved HTML encoder"
+    }
+  ]
+}

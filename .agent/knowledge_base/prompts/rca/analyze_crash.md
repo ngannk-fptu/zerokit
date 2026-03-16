@@ -4,10 +4,10 @@ agent: "rca"
 method: "analyze_crash"
 description: "Analyzes runtime crash logs and source code to identify root cause"
 last_updated: "2026-02-09"
-author: "antigravity"
+author: "security-team"
 
 # LLM Configuration
-default_model: "gemini-1.5-pro"
+default_model: "baseline-model"
 temperature: 0.1
 max_tokens: 2048
 response_format: "json"

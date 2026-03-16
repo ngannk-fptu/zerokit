@@ -1,0 +1,15 @@
+{
+  "run_id": "example-run-001",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "items": [
+    {
+      "id": "as-001",
+      "source": "orchestration-shim",
+      "kind": "http_endpoint",
+      "path": "src/api/users.ts",
+      "line": 42,
+      "confidence": "high",
+      "notes": "User update endpoint accepts untrusted body"
+    }
+  ]
+}

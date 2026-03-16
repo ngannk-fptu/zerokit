@@ -1,4 +1,4 @@
-# SANS/MITRE CWE Top 25 — Hunt-Pipeline Reference
+# SANS/MITRE CWE Top 25 — Harness Reference
 
 Quick reference for the 25 most dangerous CWEs. Use with `CweManager.get_cwe()` and
 `CweManager.search_cwe()` during Phase 3 hypothesis generation.

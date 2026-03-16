@@ -1,4 +1,4 @@
-# Logic Flaw Vulnerability Catalog — Hunt-Pipeline Reference
+# Logic Flaw Vulnerability Catalog — Harness Reference
 
 Logic flaws are vulnerabilities in business logic that SAST tools cannot detect.
 These MUST be generated as Hypotheses manually during Phase 3.

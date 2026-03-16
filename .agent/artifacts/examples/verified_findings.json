@@ -1,0 +1,12 @@
+{
+  "run_id": "example-run-001",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "items": [
+    {
+      "finding_id": "sf-001",
+      "source": "orchestration-shim",
+      "status": "confirmed",
+      "reason": "PoC reproduces stored XSS with executable payload"
+    }
+  ]
+}

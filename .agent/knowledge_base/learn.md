@@ -177,7 +177,7 @@ Code & Build → Attack Surface Mapping → Hypotheses → Static Query/RULE Sca
 
 Each arrow represents outputs feeding the next stage. Importantly, there are feedback loops: e.g., if dynamic testing finds a bug, you might go back and refine a static rule to find variants; if a hypothesis proves fruitless, you generate new hypotheses or revisit the threat model. The pipeline is thus a DAG with some iterative cycles until diminishing returns.
 
-## Agent Toolkit Design (Claude Code / Antigravity Implementation)
+## Agent Toolkit Design (Claude Code Implementation)
 
 To automate this methodology, we design an **agent-based system** with specialized skills for each stage, coordinated by an orchestrator. The focus is on **modularity, verification at each step, and preventing hallucinations** (i.e. every claim an agent makes must be checked by another action, typically by running code or queries). Below is a proposed decomposition into agents, along with their responsibilities and the safety/validation mechanisms employed:
 

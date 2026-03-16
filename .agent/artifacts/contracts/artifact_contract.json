@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "artifacts": {
+    "attack_surface": {
+      "required_fields": ["run_id", "generated_at", "items"],
+      "item_required_fields": ["id", "kind", "path", "line", "confidence", "notes"],
+      "item_optional_fields": {
+        "source": "string"
+      }
+    },
+    "hypotheses": {
+      "required_fields": ["run_id", "generated_at", "items"],
+      "item_required_fields": ["id", "title", "cwe", "source", "sink", "priority", "rationale"]
+    },
+    "static_findings": {
+      "required_fields": ["run_id", "generated_at", "items"],
+      "item_required_fields": ["id", "tool", "severity", "path", "line", "evidence", "hypothesis_id"],
+      "item_optional_fields": {
+        "source": "string"
+      }
+    },
+    "verification_evidence": {
+      "required_fields": ["run_id", "generated_at", "items"],
+      "item_required_fields": ["finding_id", "status", "command", "exit_code", "output_excerpt", "artifact_path"],
+      "item_optional_fields": {
+        "source": "string"
+      }
+    },
+    "verified_findings": {
+      "required_fields": ["run_id", "generated_at", "items"],
+      "item_required_fields": ["finding_id", "status", "reason"],
+      "item_optional_fields": {
+        "source": "string"
+      }
+    },
+    "rca_and_variants": {
+      "required_fields": ["run_id", "generated_at", "items"],
+      "item_required_fields": ["finding_id", "root_cause", "variant_query", "variant_hits", "patch_guidance"]
+    },
+    "final_report_items": {
+      "required_fields": ["run_id", "generated_at", "items"],
+      "item_required_fields": ["finding_id", "status", "title", "affected_path", "line", "evidence_ref", "remediation", "regression_test"],
+      "item_optional_fields": {
+        "source": "string"
+      }
+    }
+  },
+  "run_state": {
+    "required_fields": [
+      "run_id",
+      "generated_at",
+      "target",
+      "master_workflow",
+      "phase_refs",
+      "phase_status",
+      "status",
+      "summary"
+    ],
+    "optional_fields": {
+      "simulated": "boolean",
+      "artifact_metrics": "object"
+    }
+  },
+  "enums": {
+    "verification_status": ["confirmed", "rejected", "inconclusive"],
+    "finding_status": ["confirmed", "rejected", "inconclusive"],
+    "priority": ["critical", "high", "medium", "low"]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "run_id": "example-run-001",
+  "generated_at": "2026-03-03T00:00:00Z",
+  "languages": ["typescript", "dotnet"],
+  "frameworks": ["express", "aspnetcore"],
+  "build_commands": ["npm run build", "dotnet build"],
+  "test_commands": ["npm test", "dotnet test"],
+  "entrypoints": [
+    {"kind": "http", "path": "src/server/routes/users.ts", "line": 12},
+    {"kind": "http", "path": "Api/Controllers/UserController.cs", "line": 18}
+  ],
+  "trust_boundaries": ["http-request-body", "jwt-claims", "message-bus"],
+  "high_risk_sinks": ["sql-execution", "template-render", "file-write", "process-spawn"]
+}

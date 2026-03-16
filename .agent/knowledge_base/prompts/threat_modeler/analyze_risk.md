@@ -7,7 +7,7 @@ last_updated: "2026-02-06"
 author: "security-team"
 
 # LLM Configuration
-default_model: "gemini-1.5-pro"
+default_model: "baseline-model"
 temperature: 0.2
 max_tokens: 4096
 

@@ -1,0 +1,3 @@
+[project]
+name = "worker"
+dependencies = ["fastapi>=0.100.0"]
