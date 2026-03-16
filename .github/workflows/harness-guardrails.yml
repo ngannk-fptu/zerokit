@@ -1,0 +1,51 @@
+name: Harness Guardrails
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Scope boundaries
+        run: python tools/ci/check_scope_boundaries.py
+
+      - name: Artifact contract
+        run: python tools/ci/validate_artifact_contract.py
+
+      - name: Language detector contract
+        run: python tools/ci/validate_language_detector_contract.py
+
+      - name: Language detector fixtures
+        run: python tools/ci/test_language_detector_fixtures.py
+
+      - name: Install dev dependencies
+        continue-on-error: false
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        continue-on-error: false
+        run: make lint
+
+      - name: Test
+        continue-on-error: false
+        run: make test
+
+      - name: Stale reference check
+        continue-on-error: false
+        run: python tools/ci/check_stale_references.py
