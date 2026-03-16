@@ -1,0 +1,15 @@
+{
+  "run_id": "fixture-phase03",
+  "generated_at": "2026-01-01T00:00:00Z",
+  "items": [
+    {
+      "id": "hyp-001",
+      "title": "Command injection via user input",
+      "cwe": "CWE-78",
+      "source": "vuln_app.py:run_command parameter user_input",
+      "sink": "vuln_app.py:6 subprocess.call(user_input, shell=True)",
+      "priority": "high",
+      "rationale": "User input flows directly into shell command execution"
+    }
+  ]
+}
