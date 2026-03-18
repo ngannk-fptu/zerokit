@@ -22,6 +22,9 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Workflow integrity
+        run: python tools/ci/check_workflow_integrity.py
+
       - name: Scope boundaries
         run: python tools/ci/check_scope_boundaries.py
 
@@ -33,6 +36,9 @@ jobs:
 
       - name: Language detector fixtures
         run: python tools/ci/test_language_detector_fixtures.py
+
+      - name: Harness tools smoke test
+        run: python tools/ci/smoke_harness_tools.py
 
       - name: Install dev dependencies
         continue-on-error: false
