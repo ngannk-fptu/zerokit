@@ -1,0 +1,247 @@
+1.Unify YAML adapters and profiles.py into single SecurityProfile source
+context-engineering
+
+ Problem
+Two parallel SecurityProfile systems:
+
+YAML adapters (knowledge_base/adapters/*.yaml) — rich, CWE-mapped, framework-specific
+core/profiles.py — hardcoded Python, less detailed
+Profiler uses YAML, Detector/Verifier use profiles.py → knowledge duplication, inconsistency.
+
+Fix
+profiles.py should load from YAML adapters as primary source, fallback to hardcoded if YAML missing.
+
+Files
+core/profiles.py
+.agent/knowledge_base/adapters/*.yaml
+
+
+
+
+2.Wire taint trace from Explainer into Verifier PoC generation
+
+Problem
+Explainer creates finding.taint_trace (source→sink path) but Verifier ignores it when generating PoC. LLM writes PoC without knowing exact data flow path → generic, often fails.
+
+Fix
+Pass finding.taint_trace as context to _generate_poc():
+
+context = template_content + "\nData Flow: " + format_trace(finding.taint_trace)
+Impact
+Estimated +8% PoC success rate.
+
+Files
+core/agents/verifier.py — _generate_poc()
+
+
+
+3.Remove or extract skills/superpowers/ into separate repo
+skills/superpowers/ contains hundreds of files for generic dev workflows (test scripts, skill definitions). Not related to ZeroKit2 security pipeline. Accounts for majority of 300K+ lines added in restructure. Consider extracting to submodule or removing.
+
+
+
+4.Add .gitignore entries for sensitive artifacts
+
+Missing gitignore entries: storage/, *.db, templates/poc/*.generated.py, .agent/prompts/archive/, llm_cache.db, pipeline.db. PoC scripts and crash logs could be accidentally committed.
+
+
+
+5.Add audit trail for agent decisions
+
+No logging of which agent decided what, when, based on what evidence. PipelineObserver exists but doesn't log LLM decision reasoning. Needed for debugging false positives/negatives.
+
+
+6.Migrate or remove old test suite (imports pipeline.* instead of core.*)
+
+23 test files in tests/pipeline/ import from pipeline.* (old structure). All fail. Either migrate to core.* imports or remove and rely on new tests/test_*.py suite (65 tests passing).
+
+
+7.Add verification strategies for non-crash bugs (IDOR, timing, multi-step)
+detection-quality
+
+Problem
+Verifier only checks exit_code == 0 → confirmed. Non-crash bugs need different strategies:
+
+Race condition → timing analysis
+IDOR → diff response between 2 users
+Crypto weakness → statistical analysis
+Business logic → multi-step workflow
+Acceptance Criteria
+
+Verification strategies: CRASH_BASED, DIFF_BASED, TIMING_BASED, MULTI_STEP
+
+Verifier selects strategy based on CWE category
+
+
+8.Split learn.md (45K+ tokens) into smaller topic files
+
+Problem
+learn.md = 45K+ tokens. If loaded into agent context → 22% of 200K context window. Risk of context exhaustion and instruction forgetting.
+
+Fix
+Split into 5-6 files: learn-static-analysis.md, learn-fuzzing.md, learn-methodology.md, learn-variant-analysis.md, etc. Lazy-load only relevant section per phase.
+
+
+9.Add cross-endpoint analysis phase
+
+Problem
+Each endpoint analyzed in isolation. Chained vulnerabilities missed: token generation weakness + token usage in auth → account takeover. File upload + file serving without content-type check → stored XSS.
+
+Acceptance Criteria
+
+Phase 3 includes cross-endpoint correlation after individual analysis
+
+LLM receives all endpoints + shared data flows between them
+
+
+
+10.Run Semgrep community rules before LLM-generated rules
+
+Problem
+Detector runs LLM-generated rules alongside community rules. Should run community rules first (p/owasp-top-ten, p/php, p/flask) — covers 80% low-hanging fruit without LLM cost. LLM rules only for gaps.
+
+Acceptance Criteria
+
+Community rules run first, findings deduplicated
+
+LLM rules generated only for hypotheses not covered by community findings
+
+
+11.Improve framework detection beyond file extension counting
+
+Problem
+detect_language() only counts file extensions. .py → always ("python", None). Cannot distinguish Flask/Django/FastAPI. Wrong framework → wrong SecurityProfile sources/sinks.
+
+Fix
+Check marker files: manage.py → Django, pom.xml + Spring → Spring Boot, composer.json → Laravel/Symfony, package.json → Express/Next.js.
+
+Files
+core/profiles.py — detect_language()
+
+
+12.LLM cache stores source code plaintext — data protection risk
+
+Problem
+core/llm_cache.py stores full prompt_text (containing target source code) in SQLite. For pentest engagements, this violates data handling policies.
+
+Fix
+Option A: Store only prompt_hash + response, drop prompt_text
+Option B: Encrypt prompt text before storage
+
+Files
+core/llm_cache.py — set() method, line ~85
+
+
+13.Create missing PoC template files for CWE mapping
+
+Problem
+CWE_TEMPLATE_MAP references 15 templates but only 2-3 exist. Missing 8 templates: command_injection.py, path_traversal.py, code_injection.py, ssrf_check.py, idor_check.py, deserialization.py, xxe.py, missing_authz_check.py.
+
+When template file missing → LLM writes entire PoC from scratch → lower quality.
+
+Acceptance Criteria
+
+All 8 template files created in templates/poc/
+
+Each template: standalone, exit 0 (confirmed) / exit 1 (rejected)
+
+LLM only fills target-specific parameters
+
+
+14.ThreatModeler: pass function body code, not just metadata
+
+Problem
+threat_modeler.py line 50-56: function_signature = filename (same value). LLM receives no actual code, must "guess" vulnerabilities from function names. Generic names like get_data(), process(), handle() → LLM blind.
+
+Proposed Fix
+Profiler extracts function body (20-50 lines around entry point)
+Profiler extracts middleware chain / auth decorators
+Pass both to ThreatModeler prompt as function_body + middleware_chain
+Impact
+Estimated +15% detection rate improvement.
+
+Files
+core/agents/threat_modeler.py (consume new vars)
+core/agents/profiler.py (extract code)
+.agent/knowledge_base/prompts/threat_modeler/analyze_risk.md (add to required_vars)
+
+
+15.Add JSON schema validation for LLM outputs
+
+Problem
+LLM responses parsed via raw json.loads() — no schema validation. Hallucinated/malformed JSON crashes pipeline. Affected: hypothesis generation, RCA, variant extraction, Semgrep rule generation.
+
+Acceptance Criteria
+
+parse_llm_json() helper: strip markdown wrappers, validate schema, retry on failure
+
+Pydantic validation for hypothesis, RCA, variant pattern outputs
+
+Max 2 retries with error feedback to LLM
+
+Unit tests for malformed JSON handling
+
+
+16.LLMGateway locked to Antigravity — add Gemini API fallback
+
+Problem
+core/llm_gateway.py hardcodes self.provider = "antigravity". If Antigravity monitor is not running, entire pipeline hangs. New developers cannot test pipeline without Antigravity setup.
+
+Proposed Fix
+if self._check_antigravity_available():
+    self.adapter = AntigravityAdapter(...)
+else:
+    self.adapter = GeminiDirectAdapter(api_key=os.getenv("GOOGLE_API_KEY"))
+Acceptance Criteria
+
+Pipeline works with GOOGLE_API_KEY env var (no Antigravity needed)
+
+Antigravity still prioritized when available
+
+Clear error message when both unavailable
+Files
+core/llm_gateway.py
+core/adapters/ (new GeminiDirectAdapter)
+
+
+17.Sandbox --network none blocks HTTP-level PoC verification
+
+Problem
+sandbox_executor.py uses --network none for all PoC execution. Web vulnerability PoCs (SQLi time-based, XSS reflected, SSRF, IDOR) need HTTP access to target app. These PoCs never verify successfully in current sandbox.
+
+Proposed Fix
+Unit-test PoC (direct function call): keep --network none
+HTTP-level PoC (request to target): use Docker user-defined network, allow traffic to target container only
+Add sandbox_type param: isolated vs target-only
+Acceptance Criteria
+
+PoC scripts can reach target app container
+
+Cannot reach internet/external hosts
+
+Configurable per-finding based on sandbox_type in prompt metadata
+Files
+core/tools/sandbox_executor.py
+
+
+18.Validate Joern web taint queries with real Joern installation
+
+Problem
+17 web taint queries (PHP, Java, JS, Python) written but never tested with actual Joern CLI. Joern PHP/Python/JS parser maturity varies — queries may need syntax adjustment. reachableByFlows() on non-C languages may be incomplete or slow.
+
+Acceptance Criteria
+
+Install Joern CLI on dev machine
+
+Parse tests/fixtures/sqli.php → CPG successfully
+
+php_sqli_taint query detects SQLi at line 12
+
+Parse tests/fixtures/xss.py → test Python queries
+
+Document supported/unsupported Joern features per language
+
+Fix query syntax where needed
+Context
+Queries in core/tools/joern_queries.py (25 total, 17 new web queries).
+
