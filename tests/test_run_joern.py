@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
 import tools.harness.run_joern as run_joern
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -407,3 +408,82 @@ def test_run_joern_integration_real_container(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert isinstance(payload["items"], list)
+
+
+@pytest.mark.integration
+def test_run_joern_integration_phase03_fixture_with_cleanup(tmp_path: Path) -> None:
+    if shutil.which("docker") is None:
+        pytest.skip("docker not available")
+
+    fixture_dir = REPO_ROOT / "tests/fixtures/phase03-e2e"
+    output_path = tmp_path / "joern-phase03.json"
+
+    before = subprocess.run(
+        ["docker", "ps", "--filter", "ancestor=ghcr.io/joernio/joern", "-q"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    before_ids = {line.strip() for line in before.stdout.splitlines() if line.strip()}
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_PATH),
+                "--target",
+                str(fixture_dir),
+                "--run-id",
+                "integration-joern-phase03",
+                "--output",
+                str(output_path),
+                "--timeout",
+                "90",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+
+        if result.returncode != 0:
+            stderr = result.stderr.lower()
+            if any(token in stderr for token in ("failed to resolve reference", "not found", "pull access denied")):
+                pytest.skip("joern image not available")
+
+        assert result.returncode == 0, result.stderr
+        assert output_path.exists()
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+        assert payload["run_id"] == "integration-joern-phase03"
+        assert payload["items"], "expected taint findings from phase03 fixture"
+
+        required_fields = ["tool", "rule", "severity", "path", "line", "evidence", "cwe"]
+        for item in payload["items"]:
+            for field_name in required_fields:
+                assert field_name in item
+        joined_evidence = "\n".join(item["evidence"] for item in payload["items"]).lower()
+        assert "subprocess.call" in joined_evidence or "shell=true" in joined_evidence
+    finally:
+        after = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=ghcr.io/joernio/joern", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        after_ids = {line.strip() for line in after.stdout.splitlines() if line.strip()}
+        for container_id in sorted(after_ids - before_ids):
+            subprocess.run(
+                ["docker", "rm", "-f", container_id],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        final_check = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=ghcr.io/joernio/joern", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        final_ids = {line.strip() for line in final_check.stdout.splitlines() if line.strip()}
+        assert final_ids - before_ids == set()

@@ -310,3 +310,83 @@ def test_run_poc_integration_real_docker_execution(tmp_path: Path) -> None:
     ]
     for field_name in required_fields:
         assert field_name in payload["items"][0]
+
+
+@pytest.mark.integration
+def test_run_poc_integration_phase03_fixture_with_cleanup(tmp_path: Path) -> None:
+    if shutil.which("docker") is None:
+        pytest.skip("docker not available")
+
+    fixture_dir = REPO_ROOT / "tests/fixtures/phase03-e2e"
+    output_path = tmp_path / "run-poc-phase03.json"
+    poc_script = tmp_path / "poc.py"
+    poc_script.write_text(
+        "from __future__ import annotations\nimport sys\nprint('exploit confirmed')\nsys.exit(0)\n",
+        encoding="utf-8",
+    )
+
+    before = subprocess.run(
+        ["docker", "ps", "--filter", "ancestor=python:3.11-slim", "-q"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    before_ids = {line.strip() for line in before.stdout.splitlines() if line.strip()}
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT_PATH),
+                "--finding-id",
+                "sf-999",
+                "--poc-script",
+                str(poc_script),
+                "--target",
+                str(fixture_dir),
+                "--run-id",
+                "integration-poc-phase03",
+                "--output",
+                str(output_path),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert output_path.exists()
+
+        payload = json.loads(output_path.read_text(encoding="utf-8"))
+        assert payload["run_id"] == "integration-poc-phase03"
+        evidence_item = payload["items"][0]
+        assert evidence_item["status"] == "confirmed"
+        assert evidence_item["finding_id"] == "sf-999"
+        assert evidence_item["exit_code"] == 0
+        assert "--network none" in evidence_item["command"]
+        assert "--memory 128m" in evidence_item["command"]
+        assert "--rm" in evidence_item["command"]
+    finally:
+        after = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=python:3.11-slim", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        after_ids = {line.strip() for line in after.stdout.splitlines() if line.strip()}
+        for container_id in sorted(after_ids - before_ids):
+            subprocess.run(
+                ["docker", "rm", "-f", container_id],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        final_check = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=python:3.11-slim", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        final_ids = {line.strip() for line in final_check.stdout.splitlines() if line.strip()}
+        assert final_ids - before_ids == set()

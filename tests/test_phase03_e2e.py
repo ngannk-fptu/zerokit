@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# pyright: reportMissingImports=false
 import importlib.util
 import json
 import shutil
@@ -330,3 +331,210 @@ def test_full_pipeline_integration(tmp_path: Path) -> None:
     for item in payload["items"]:
         assert_required_fields(item, rules["item_required_fields"])
         assert item["severity"] in severities
+
+
+@pytest.mark.integration
+def test_phase03_cross_tool_integration_with_joern_and_poc(tmp_path: Path) -> None:
+    if shutil.which("docker") is None:
+        pytest.skip("docker not available")
+    if shutil.which("semgrep") is None:
+        pytest.skip("semgrep is not installed")
+    if shutil.which("gitleaks") is None:
+        pytest.skip("gitleaks is not installed")
+
+    run_joern_script = REPO_ROOT / "tools/harness/run_joern.py"
+    run_poc_script = REPO_ROOT / "tools/harness/run_poc.py"
+
+    run_id = "fixture-phase03-cross-tool"
+    semgrep_out = tmp_path / "semgrep.json"
+    gitleaks_out = tmp_path / "gitleaks.json"
+    joern_out = tmp_path / "joern.json"
+    merged_out = tmp_path / "static_findings.json"
+    evidence_out = tmp_path / "verification_evidence.json"
+    poc_script = tmp_path / "poc.py"
+    poc_script.write_text(
+        "from __future__ import annotations\nimport sys\nprint('exploit confirmed')\nsys.exit(0)\n",
+        encoding="utf-8",
+    )
+
+    joern_before = subprocess.run(
+        ["docker", "ps", "--filter", "ancestor=ghcr.io/joernio/joern", "-q"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    joern_before_ids = {line.strip() for line in joern_before.stdout.splitlines() if line.strip()}
+    poc_before = subprocess.run(
+        ["docker", "ps", "--filter", "ancestor=python:3.11-slim", "-q"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    poc_before_ids = {line.strip() for line in poc_before.stdout.splitlines() if line.strip()}
+
+    try:
+        semgrep_proc = subprocess.run(
+            [
+                sys.executable,
+                str(RUN_SEMGREP_SCRIPT),
+                "--target",
+                str(FIXTURE_DIR),
+                "--run-id",
+                run_id,
+                "--output",
+                str(semgrep_out),
+                "--rulesets",
+                "p/security-audit",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert semgrep_proc.returncode == 0, semgrep_proc.stderr
+
+        gitleaks_proc = subprocess.run(
+            [
+                sys.executable,
+                str(RUN_GITLEAKS_SCRIPT),
+                "--target",
+                str(FIXTURE_DIR),
+                "--run-id",
+                run_id,
+                "--output",
+                str(gitleaks_out),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert gitleaks_proc.returncode in (0, 1), gitleaks_proc.stderr
+
+        joern_proc = subprocess.run(
+            [
+                sys.executable,
+                str(run_joern_script),
+                "--target",
+                str(FIXTURE_DIR),
+                "--run-id",
+                run_id,
+                "--output",
+                str(joern_out),
+                "--timeout",
+                "90",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+        if joern_proc.returncode != 0:
+            stderr = joern_proc.stderr.lower()
+            if any(token in stderr for token in ("failed to resolve reference", "not found", "pull access denied")):
+                pytest.skip("joern image not available")
+        assert joern_proc.returncode == 0, joern_proc.stderr
+
+        merge_proc = subprocess.run(
+            [
+                sys.executable,
+                str(MERGE_FINDINGS_SCRIPT),
+                "--inputs",
+                str(semgrep_out),
+                str(gitleaks_out),
+                str(joern_out),
+                "--run-id",
+                run_id,
+                "--output",
+                str(merged_out),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert merge_proc.returncode == 0, merge_proc.stderr
+
+        merged_payload = json.loads(merged_out.read_text(encoding="utf-8"))
+        assert merged_payload["items"], "expected merged findings"
+        toolset = {item["tool"] for item in merged_payload["items"]}
+        assert {"semgrep", "gitleaks", "joern"}.issubset(toolset)
+
+        finding_id = merged_payload["items"][0]["id"]
+        poc_proc = subprocess.run(
+            [
+                sys.executable,
+                str(run_poc_script),
+                "--finding-id",
+                finding_id,
+                "--poc-script",
+                str(poc_script),
+                "--target",
+                str(FIXTURE_DIR),
+                "--run-id",
+                run_id,
+                "--output",
+                str(evidence_out),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert poc_proc.returncode == 0, poc_proc.stderr
+
+        evidence_payload = json.loads(evidence_out.read_text(encoding="utf-8"))
+        contract = json.loads(ARTIFACT_CONTRACT.read_text(encoding="utf-8"))
+        rules = contract["artifacts"]["verification_evidence"]
+        assert_required_fields(evidence_payload, rules["required_fields"])
+        assert evidence_payload["items"]
+        assert_required_fields(evidence_payload["items"][0], rules["item_required_fields"])
+        assert evidence_payload["items"][0]["finding_id"] == finding_id
+        assert evidence_payload["items"][0]["status"] == "confirmed"
+        assert evidence_payload["items"][0]["exit_code"] == 0
+    finally:
+        joern_after = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=ghcr.io/joernio/joern", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        joern_after_ids = {line.strip() for line in joern_after.stdout.splitlines() if line.strip()}
+        for container_id in sorted(joern_after_ids - joern_before_ids):
+            subprocess.run(
+                ["docker", "rm", "-f", container_id],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        poc_after = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=python:3.11-slim", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        poc_after_ids = {line.strip() for line in poc_after.stdout.splitlines() if line.strip()}
+        for container_id in sorted(poc_after_ids - poc_before_ids):
+            subprocess.run(
+                ["docker", "rm", "-f", container_id],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        joern_final = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=ghcr.io/joernio/joern", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        joern_final_ids = {line.strip() for line in joern_final.stdout.splitlines() if line.strip()}
+        assert joern_final_ids - joern_before_ids == set()
+        poc_final = subprocess.run(
+            ["docker", "ps", "--filter", "ancestor=python:3.11-slim", "-q"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        poc_final_ids = {line.strip() for line in poc_final.stdout.splitlines() if line.strip()}
+        assert poc_final_ids - poc_before_ids == set()
