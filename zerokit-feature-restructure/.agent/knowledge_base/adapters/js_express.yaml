@@ -1,0 +1,95 @@
+framework: express
+language: javascript
+description: "Security adapter for Express.js / Next.js / Koa applications"
+
+sources:
+  - method: "req.body"
+    description: "Parsed HTTP request body (body-parser)"
+    cwe_concern: [CWE-89, CWE-78, CWE-502]
+  - method: "req.query"
+    description: "URL query string parameters"
+    cwe_concern: [CWE-89, CWE-79, CWE-22]
+  - method: "req.params"
+    description: "URL route parameters (Express)"
+    cwe_concern: [CWE-89, CWE-22]
+  - method: "req.headers"
+    description: "HTTP request headers"
+    cwe_concern: [CWE-113, CWE-79]
+  - method: "req.cookies"
+    description: "Cookie values"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "req.files"
+    description: "Uploaded files (multer/formidable)"
+    cwe_concern: [CWE-434]
+  - method: "process.env"
+    description: "Environment variables (potential secret leak)"
+    cwe_concern: [CWE-200]
+
+sinks:
+  - function: "eval"
+    cwe: CWE-94
+    severity: CRITICAL
+  - function: "Function"
+    cwe: CWE-94
+    severity: CRITICAL
+  - function: "child_process.exec"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "child_process.execSync"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "child_process.spawn"
+    cwe: CWE-78
+    severity: HIGH
+  - function: "res.send"
+    cwe: CWE-79
+    severity: MEDIUM
+  - function: "res.render"
+    cwe: CWE-79
+    severity: HIGH
+  - function: "res.redirect"
+    cwe: CWE-601
+    severity: HIGH
+  - function: "fs.readFile"
+    cwe: CWE-22
+    severity: HIGH
+  - function: "fs.readFileSync"
+    cwe: CWE-22
+    severity: HIGH
+  - function: "path.join"
+    cwe: CWE-22
+    severity: MEDIUM
+  - function: "require"
+    cwe: CWE-706
+    severity: HIGH
+  - function: "JSON.parse"
+    cwe: CWE-502
+    severity: LOW
+  - function: "serialize"
+    cwe: CWE-502
+    severity: CRITICAL
+  - function: "db.query"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "knex.raw"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "mongoose.Model.find"
+    cwe: CWE-943
+    severity: HIGH
+
+sanitizers:
+  - function: "DOMPurify.sanitize"
+    description: "HTML sanitizer"
+  - function: "escape"
+    description: "Basic HTML escaping"
+  - function: "encodeURIComponent"
+    description: "URL encoding"
+  - function: "validator.escape"
+    description: "validator.js HTML escape"
+  - function: "parameterized"
+    description: "Parameterized SQL queries"
+  - function: "sanitize-html"
+    description: "sanitize-html npm package"
+  - function: "xss"
+    description: "xss npm package"

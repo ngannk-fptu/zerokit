@@ -1,0 +1,11 @@
+requests>=2.28.0
+pydantic>=2.0.0
+asyncio
+aiohttp
+pyyaml
+rich
+python-dotenv
+beautifulsoup4
+pytest
+docker>=6.1.0
+markdown

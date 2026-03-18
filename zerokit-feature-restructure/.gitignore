@@ -1,0 +1,44 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment
+.env
+.venv
+env/
+venv/
+.gemini/
+
+# Scanner Data & DBs
+storage/
+*.db
+*.log
+diff_status.txt
+
+# Target Codebases
+piranha.core/
+workdir/
+
+# Build & Temp Files
+bin/
+obj/
+**/bin/
+**/obj/
+
+# Local workspace files
+.claude/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated PoC Scripts
+templates/poc/*.generated.py
+
+# Databases
+*.db
+llm_cache.db
+pipeline.db

@@ -1,0 +1,6 @@
+{
+  "apiVersion": 3,
+  "title": "ASM Navigation Link Extension",
+  "name": "asm/navigation-link",
+  "editorScript": "file:./index.js"
+}

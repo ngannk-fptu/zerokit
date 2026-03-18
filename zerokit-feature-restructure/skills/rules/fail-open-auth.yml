@@ -1,0 +1,49 @@
+rules:
+  - id: wordpress-fail-open-auth
+    languages:
+      - php
+    severity: ERROR
+    message: "Potential Fail-Open Authentication: Permission check failed but execution continues. Ensure you call 'return', 'die', 'exit', or 'wp_die' inside the failure block."
+    metadata:
+      cwe: "CWE-693: Protection Mechanism Failure"
+      owasp: "A01:2021 - Broken Access Control"
+      category: "security"
+      technology:
+        - "wordpress"
+    patterns:
+      - pattern-inside: |
+          function $FUNC(...) {
+            ...
+          }
+      - pattern: |
+          if ( <... ! $CHECK(...) ...> ) {
+            $BODY
+          }
+      - metavariable-regex:
+          metavariable: $CHECK
+          regex: ".*(current_user_can|is_user_logged_in|check_ajax_referer|wp_verify_nonce|auth|permission|cap|login|verify).*"
+      - pattern-not: |
+          if ( ... ) {
+            ...
+            return ...;
+          }
+      - pattern-not: |
+          if ( ... ) {
+            ...
+            die(...);
+          }
+      - pattern-not: |
+          if ( ... ) {
+            ...
+            exit(...);
+          }
+      - pattern-not: |
+          if ( ... ) {
+            ...
+            wp_die(...);
+          }
+      - pattern-not: |
+          if ( ... ) {
+            ...
+            wp_send_json_error(...);
+          }

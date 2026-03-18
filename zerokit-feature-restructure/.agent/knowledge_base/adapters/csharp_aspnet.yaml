@@ -1,0 +1,91 @@
+framework: aspnet-core
+language: csharp
+description: "Security adapter for ASP.NET Core / MVC / Web API applications"
+
+sources:
+  - annotation: "[FromBody]"
+    description: "HTTP request body binding"
+    cwe_concern: [CWE-502, CWE-89]
+  - annotation: "[FromQuery]"
+    description: "Query string binding"
+    cwe_concern: [CWE-89, CWE-79]
+  - annotation: "[FromRoute]"
+    description: "Route parameter binding"
+    cwe_concern: [CWE-22, CWE-89]
+  - annotation: "[FromHeader]"
+    description: "HTTP header binding"
+    cwe_concern: [CWE-113, CWE-79]
+  - annotation: "[FromForm]"
+    description: "Form data binding"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "HttpContext.Request.Form"
+    description: "Raw form access"
+    cwe_concern: [CWE-89]
+  - method: "HttpContext.Request.QueryString"
+    description: "Raw query string"
+    cwe_concern: [CWE-89]
+  - method: "HttpContext.Request.Headers"
+    description: "Raw header access"
+    cwe_concern: [CWE-113]
+  - method: "IFormFile"
+    description: "Uploaded file interface"
+    cwe_concern: [CWE-434]
+
+sinks:
+  - function: "SqlCommand"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "SqlConnection.Execute"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "ExecuteSqlRaw"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "FromSqlRaw"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "Process.Start"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "ProcessStartInfo"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "Content()"
+    cwe: CWE-79
+    severity: HIGH
+  - function: "RedirectResult"
+    cwe: CWE-601
+    severity: HIGH
+  - function: "Redirect"
+    cwe: CWE-601
+    severity: HIGH
+  - function: "File.ReadAllText"
+    cwe: CWE-22
+    severity: HIGH
+  - function: "Path.Combine"
+    cwe: CWE-22
+    severity: MEDIUM
+  - function: "BinaryFormatter.Deserialize"
+    cwe: CWE-502
+    severity: CRITICAL
+  - function: "JsonConvert.DeserializeObject"
+    cwe: CWE-502
+    severity: LOW
+  - function: "XmlSerializer.Deserialize"
+    cwe: CWE-611
+    severity: HIGH
+  - function: "LdapConnection.Search"
+    cwe: CWE-90
+    severity: HIGH
+
+sanitizers:
+  - function: "HtmlEncoder.Default.Encode"
+    description: "ASP.NET Core built-in HTML encoder"
+  - function: "SqlParameters"
+    description: "Parameterized SQL"
+  - function: "AntiXssEncoder"
+    description: "Microsoft AntiXSS"
+  - annotation: "[ValidateAntiForgeryToken]"
+    description: "CSRF protection"
+  - function: "ModelState.IsValid"
+    description: "Model validation gate"

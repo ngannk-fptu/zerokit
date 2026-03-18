@@ -1,0 +1,84 @@
+framework: spring-boot
+language: java
+description: "Security adapter for Spring Boot / Spring MVC applications"
+
+sources:
+  - annotation: "@RequestParam"
+    description: "HTTP query parameter binding"
+    cwe_concern: [CWE-89, CWE-79, CWE-78]
+  - annotation: "@RequestBody"
+    description: "HTTP request body (JSON/XML deserialization)"
+    cwe_concern: [CWE-502, CWE-89]
+  - annotation: "@PathVariable"
+    description: "URL path segment binding"
+    cwe_concern: [CWE-22, CWE-89]
+  - annotation: "@RequestHeader"
+    description: "HTTP header binding"
+    cwe_concern: [CWE-113, CWE-79]
+  - annotation: "@CookieValue"
+    description: "HTTP cookie value binding"
+    cwe_concern: [CWE-89, CWE-79]
+  - annotation: "@RequestPart"
+    description: "Multipart file upload binding"
+    cwe_concern: [CWE-434]
+  - method: "HttpServletRequest.getParameter"
+    description: "Raw servlet parameter access"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "HttpServletRequest.getHeader"
+    description: "Raw header access"
+    cwe_concern: [CWE-113]
+
+sinks:
+  - function: "JdbcTemplate.query"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "JdbcTemplate.execute"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "JdbcTemplate.update"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "EntityManager.createNativeQuery"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "Runtime.exec"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "ProcessBuilder"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "response.getWriter().print"
+    cwe: CWE-79
+    severity: HIGH
+  - function: "ModelAndView"
+    cwe: CWE-79
+    severity: MEDIUM
+  - function: "redirect:"
+    cwe: CWE-601
+    severity: HIGH
+  - function: "new File"
+    cwe: CWE-22
+    severity: HIGH
+  - function: "Files.readAllBytes"
+    cwe: CWE-22
+    severity: HIGH
+  - function: "ObjectInputStream.readObject"
+    cwe: CWE-502
+    severity: CRITICAL
+  - function: "SpelExpressionParser.parseExpression"
+    cwe: CWE-917
+    severity: CRITICAL
+
+sanitizers:
+  - function: "HtmlUtils.htmlEscape"
+    description: "Spring's built-in HTML escaper"
+  - function: "PreparedStatement"
+    description: "Parameterized SQL (SQL injection prevention)"
+  - function: "NamedParameterJdbcTemplate"
+    description: "Named param queries"
+  - function: "StringEscapeUtils.escapeHtml4"
+    description: "Apache Commons HTML escape"
+  - annotation: "@Valid"
+    description: "Bean Validation (JSR-303)"
+  - annotation: "@Validated"
+    description: "Spring's validation annotation"

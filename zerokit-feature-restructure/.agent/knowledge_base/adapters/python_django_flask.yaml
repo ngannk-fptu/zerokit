@@ -1,0 +1,128 @@
+framework: django-flask
+language: python
+description: "Security adapter for Django and Flask web applications"
+
+sources:
+  - method: "request.args"
+    framework: flask
+    description: "URL query string parameters"
+    cwe_concern: [CWE-89, CWE-79, CWE-22]
+  - method: "request.form"
+    framework: flask
+    description: "Form POST data"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "request.json"
+    framework: flask
+    description: "JSON body (get_json())"
+    cwe_concern: [CWE-89, CWE-502]
+  - method: "request.files"
+    framework: flask
+    description: "Uploaded files"
+    cwe_concern: [CWE-434]
+  - method: "request.GET"
+    framework: django
+    description: "GET query parameters"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "request.POST"
+    framework: django
+    description: "POST form data"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "request.FILES"
+    framework: django
+    description: "Uploaded files"
+    cwe_concern: [CWE-434]
+  - method: "request.META"
+    framework: django
+    description: "HTTP headers and server metadata"
+    cwe_concern: [CWE-113]
+  - method: "request.COOKIES"
+    framework: django
+    description: "Cookies"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "kwargs"
+    framework: django
+    description: "URL captured groups (path converters)"
+    cwe_concern: [CWE-22, CWE-89]
+
+sinks:
+  - function: "os.system"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "subprocess.call"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "subprocess.Popen"
+    cwe: CWE-78
+    severity: CRITICAL
+  - function: "subprocess.run"
+    cwe: CWE-78
+    severity: HIGH
+  - function: "eval"
+    cwe: CWE-94
+    severity: CRITICAL
+  - function: "exec"
+    cwe: CWE-94
+    severity: CRITICAL
+  - function: "cursor.execute"
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "raw"
+    framework: django
+    cwe: CWE-89
+    severity: CRITICAL
+  - function: "extra"
+    framework: django
+    cwe: CWE-89
+    severity: HIGH
+  - function: "render_template_string"
+    framework: flask
+    cwe: CWE-94
+    severity: CRITICAL
+  - function: "Markup"
+    framework: flask
+    cwe: CWE-79
+    severity: HIGH
+  - function: "jinja2.Template"
+    cwe: CWE-94
+    severity: CRITICAL
+  - function: "open"
+    cwe: CWE-22
+    severity: HIGH
+  - function: "pickle.loads"
+    cwe: CWE-502
+    severity: CRITICAL
+  - function: "yaml.load"
+    cwe: CWE-20
+    severity: HIGH
+  - function: "send_file"
+    framework: flask
+    cwe: CWE-22
+    severity: HIGH
+  - function: "redirect"
+    cwe: CWE-601
+    severity: HIGH
+  - function: "urllib.request.urlopen"
+    cwe: CWE-918
+    severity: HIGH
+  - function: "requests.get"
+    cwe: CWE-918
+    severity: MEDIUM
+
+sanitizers:
+  - function: "escape"
+    framework: jinja2
+    description: "Jinja2 auto-escape (enabled by default)"
+  - function: "mark_safe"
+    framework: django
+    description: "Django explicit safe mark (use with caution)"
+  - function: "bleach.clean"
+    description: "bleach HTML sanitizer"
+  - function: "parameterized"
+    description: "ORM parameterized queries"
+  - function: "yaml.safe_load"
+    description: "Safe YAML loader (prevents arbitrary code execution)"
+  - annotation: "csrf_protect"
+    framework: django
+    description: "Django CSRF decorator"
+  - function: "validate_integer"
+    description: "Input type validation"

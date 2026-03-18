@@ -1,0 +1,9 @@
+{
+    "name": "zerokit",
+    "description": "Autonomous Security Research Engine. Hypothesize. Verify. Report.",
+    "version": "5.2.0",
+    "author": "ZeroKit Security Research",
+    "skills": "skills/",
+    "agents": "agents/",
+    "commands": ".agent/workflows/"
+}
