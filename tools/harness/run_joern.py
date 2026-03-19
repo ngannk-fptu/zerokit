@@ -158,23 +158,29 @@ def write_output(payload: dict[str, Any], output_path: Path) -> None:
     output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def wait_for_health(base_url: str, timeout_seconds: int) -> None:
+def wait_for_health_and_import(base_url: str, timeout_seconds: int) -> None:
     attempts = max(1, timeout_seconds // 5)
     for _ in range(attempts):
         try:
-            with urllib.request.urlopen(base_url + "/", timeout=5) as response:
+            request = urllib.request.Request(
+                url=base_url + "/query-sync",
+                data=json.dumps({"query": 'importCode("/app")'}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:
                 if getattr(response, "status", 0) == 200:
                     return
         except (ConnectionError, urllib.error.URLError, TimeoutError):
             pass
         time.sleep(5)
-    fail(f"Joern server did not become healthy within {timeout_seconds}s", exit_code=2)
+    fail(f"Joern server did not become ready within {timeout_seconds}s", exit_code=2)
 
 
 def query_taint(base_url: str) -> str:
     raw: bytes = b""
     request = urllib.request.Request(
-        url=base_url + "/query",
+        url=base_url + "/query-sync",
         data=json.dumps({"query": TAINT_QUERY}).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -213,7 +219,25 @@ def main() -> None:
 
     try:
         start = subprocess.run(
-            ["docker", "run", "-d", "--rm", "-p", f"{args.port}:8080", args.image, "--server"],
+            [
+                "docker",
+                "run",
+                "-d",
+                "--rm",
+                "-p",
+                f"{args.port}:8080",
+                "-v",
+                f"{target}:/app:rw",
+                "-w",
+                "/app",
+                args.image,
+                "joern",
+                "--server",
+                "--server-host",
+                "0.0.0.0",
+                "--server-port",
+                "8080",
+            ],
             capture_output=True,
             text=True,
             check=False,
@@ -227,7 +251,7 @@ def main() -> None:
         if not container_id:
             fail("failed to read Joern container id from docker output", exit_code=2)
 
-        wait_for_health(base_url, args.timeout)
+        wait_for_health_and_import(base_url, args.timeout)
         stdout = query_taint(base_url)
         items = parse_stdout(stdout, target)
 
