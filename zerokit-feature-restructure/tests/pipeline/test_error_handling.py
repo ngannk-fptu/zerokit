@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.agent")))
 
-from pipeline.orchestrator import Orchestrator
-from pipeline.agents.detector import Detector
-from pipeline.models import EntryPoint, EntryPointType
+from core.orchestrator import Orchestrator
+from core.agents.detector import Detector
+from core.models import EntryPoint, EntryPointType
 
 class TestStability(unittest.TestCase):
     def setUp(self):

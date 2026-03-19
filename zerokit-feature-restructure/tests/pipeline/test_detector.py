@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 # Add .agent to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.agents.detector import Detector
-from pipeline.models import FindingSeverity
+from core.agents.detector import Detector
+from core.models import FindingSeverity
 
 class TestDetector(unittest.TestCase):
     
@@ -38,7 +38,7 @@ class TestDetector(unittest.TestCase):
     @patch('pipeline.tools.semgrep_runner.subprocess.run')
     def test_runner_repair_hook_logic(self, mock_subprocess):
         # This test ensures we have the logic to catch errors, even if we mock the underlying call
-        from pipeline.tools.semgrep_runner import SemgrepRunner
+        from core.tools.semgrep_runner import SemgrepRunner
         runner = SemgrepRunner()
         
         # Simulate a subprocess error (e.g. invalid syntax)

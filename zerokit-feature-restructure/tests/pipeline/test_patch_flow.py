@@ -9,8 +9,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 agent_dir = os.path.abspath(os.path.join(current_dir, "..", "..", ".agent"))
 sys.path.append(agent_dir)
 
-from pipeline.orchestrator import Orchestrator
-from pipeline.models import VerifiedVuln, ConfirmedStatus, StaticFinding, FindingSeverity
+from core.orchestrator import Orchestrator
+from core.models import VerifiedVuln, ConfirmedStatus, StaticFinding, FindingSeverity
 
 class TestPatchFlow(unittest.TestCase):
     def setUp(self):

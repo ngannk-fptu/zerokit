@@ -7,8 +7,8 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.tools.atheris_runner import AtherisRunner
-from pipeline.tools.afl_runner import AFLRunner
+from core.tools.atheris_runner import AtherisRunner
+from core.tools.afl_runner import AFLRunner
 
 class TestAtherisRunner(unittest.TestCase):
     def setUp(self):

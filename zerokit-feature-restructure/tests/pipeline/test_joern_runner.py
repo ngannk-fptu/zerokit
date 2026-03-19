@@ -9,7 +9,7 @@ import tempfile
 # Add .agent to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.tools.joern_runner import JoernRunner
+from core.tools.joern_runner import JoernRunner
 
 class TestJoernRunner(unittest.TestCase):
     def setUp(self):

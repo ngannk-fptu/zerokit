@@ -9,8 +9,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 agent_dir = os.path.abspath(os.path.join(current_dir, "..", "..", ".agent"))
 sys.path.append(agent_dir)
 
-from pipeline.agents.detector import Detector
-from pipeline.models import Hypothesis
+from core.agents.detector import Detector
+from core.models import Hypothesis
 
 class TestDetectorSurgical(unittest.TestCase):
     def setUp(self):

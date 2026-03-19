@@ -7,7 +7,7 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.tools.jazzer_runner import JazzerRunner
+from core.tools.jazzer_runner import JazzerRunner
 
 class TestJazzerRunner(unittest.TestCase):
     def setUp(self):

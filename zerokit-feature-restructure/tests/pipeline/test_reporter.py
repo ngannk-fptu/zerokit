@@ -5,8 +5,8 @@ import sys
 # Add .agent to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.agents.reporter import Reporter
-from pipeline.models import VerifiedVuln, ConfirmedStatus, FindingSeverity
+from core.agents.reporter import Reporter
+from core.models import VerifiedVuln, ConfirmedStatus, FindingSeverity
 
 class TestReporter(unittest.TestCase):
     def test_report_generation(self):

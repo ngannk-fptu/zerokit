@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.agent")))
 
-from pipeline.agents.detector import Detector
-from pipeline.models import FindingSeverity, StaticFinding
+from core.agents.detector import Detector
+from core.models import FindingSeverity, StaticFinding
 
 class TestDetectorResilience(unittest.IsolatedAsyncioTestCase):
     async def test_detector_resilience_partial_failure(self):

@@ -5,8 +5,8 @@ import unittest
 # Add .agent to sys.path to allow importing pipeline
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.orchestrator import Orchestrator
-from pipeline.models import VerifiedVuln, ConfirmedStatus, FindingSeverity
+from core.orchestrator import Orchestrator
+from core.models import VerifiedVuln, ConfirmedStatus, FindingSeverity
 
 class TestOrchestrator(unittest.TestCase):
     def test_orchestrator_initialization(self):

@@ -5,8 +5,8 @@ import sys
 # Add .agent to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.models import AttackSurface, EntryPoint, EntryPointType
-from pipeline.agents.threat_modeler import ThreatModeler
+from core.models import AttackSurface, EntryPoint, EntryPointType
+from core.agents.threat_modeler import ThreatModeler
 
 class TestThreatModeler(unittest.TestCase):
     def test_ranking_logic(self):

@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.agent")))
 
-from pipeline.agents.verifier import Verifier
-from pipeline.models import StaticFinding, ConfirmedStatus
+from core.agents.verifier import Verifier
+from core.models import StaticFinding, ConfirmedStatus
 
 class TestVerifierLoop(unittest.TestCase):
     def setUp(self):

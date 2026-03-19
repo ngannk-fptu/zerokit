@@ -7,8 +7,8 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.tools.gitleaks_runner import GitleaksRunner
-from pipeline.tools.trivy_runner import TrivyRunner
+from core.tools.gitleaks_runner import GitleaksRunner
+from core.tools.trivy_runner import TrivyRunner
 
 class TestGitleaksRunner(unittest.TestCase):
     def setUp(self):

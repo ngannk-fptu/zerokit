@@ -5,8 +5,8 @@ import sys
 # Add .agent to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.agents.verifier import Verifier
-from pipeline.models import StaticFinding, FindingSeverity, ConfirmedStatus
+from core.agents.verifier import Verifier
+from core.models import StaticFinding, FindingSeverity, ConfirmedStatus
 
 class TestVerifier(unittest.TestCase):
     def test_verify_asan_simulation(self):

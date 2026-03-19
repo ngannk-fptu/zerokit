@@ -7,8 +7,8 @@ import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.agent')))
 
-from pipeline.agents.detector import Detector
-from pipeline.models import Hypothesis
+from core.agents.detector import Detector
+from core.models import Hypothesis
 
 class TestDetectorJoern(unittest.TestCase):
     def setUp(self):
