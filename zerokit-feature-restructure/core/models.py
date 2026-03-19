@@ -56,10 +56,17 @@ class SecurityPattern(BaseModel):
     description: Optional[str] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
+class DetectionConfig(BaseModel):
+    extensions: List[str] = Field(default_factory=list)
+    dependency_files: List[str] = Field(default_factory=list)
+    keywords: List[str] = Field(default_factory=list)
+
 class SecurityProfile(BaseModel):
     """Language and framework-specific security profile."""
     language: str
     framework: Optional[str] = None
+    priority: int = 0
+    detection: Optional[DetectionConfig] = None
     sources: List[SecurityPattern] = Field(default_factory=list)
     sinks: List[SecurityPattern] = Field(default_factory=list)
     sanitizers: List[SecurityPattern] = Field(default_factory=list)

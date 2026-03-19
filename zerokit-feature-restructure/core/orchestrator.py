@@ -368,6 +368,45 @@ class Orchestrator:
                 if observer:
                     observer.note(f"Dependency-Check skipped: {e}")
 
+            # ── Semgrep Community Rules ────────────────────────────────────
+            try:
+                from .tools.semgrep_runner import SemgrepRunner
+                semgrep = SemgrepRunner()
+                
+                # Use standard security ruleset
+                config_rules = "p/security-audit" 
+                
+                # Run the scan asynchronously
+                sg_result = await semgrep.run_scan_async(config_rules, [repo_abs_path])
+                
+                sg_findings = []
+                if sg_result and sg_result.success:
+                    for res in sg_result.findings:
+                        from ..models import FindingSeverity, StaticFinding
+                        import uuid
+                        severity_map = {"ERROR": FindingSeverity.HIGH, "WARNING": FindingSeverity.MEDIUM, "INFO": FindingSeverity.LOW}
+                        extra = res.get("extra", {})
+                        
+                        sg_findings.append(StaticFinding(
+                            id=str(uuid.uuid4())[:16],
+                            description=f"[Semgrep Community] {extra.get('message', 'Generic finding')}",
+                            location=f"{res.get('path')}:{res.get('start', {}).get('line', 0)}",
+                            severity=severity_map.get(extra.get("severity"), FindingSeverity.MEDIUM),
+                            tool_name="semgrep",
+                            metadata=res
+                        ))
+                
+                if observer:
+                    result = observer.record_tool(tool="semgrep-baseline", command="", exit_code=0, stdout="", stderr="", findings=sg_findings)
+                    if result.accepted:
+                        self.context.static_findings.extend(result.findings)
+                else:
+                    self.context.static_findings.extend(sg_findings)
+            except Exception as e:
+                logger.warning(f"Semgrep Baseline scan skipped: {e}")
+                if observer:
+                    observer.note(f"Semgrep Baseline skipped: {e}")
+
         if observer:
             with observer.phase(1, "Baseline"):
                 await _run_baseline()
@@ -409,6 +448,31 @@ class Orchestrator:
     
             # 2. Generate hypotheses via ThreatModeler (real LLM call)
         if not self.context.hypotheses:
+            # PRUNE Attack Surface based on Semgrep findings to save LLM tokens!
+            semgrep_files = set()
+            for f in self.context.static_findings:
+                if f.tool_name == "semgrep":
+                    # Location format is usually path:line
+                    path = f.location.split(":")[0] if isinstance(f.location, str) else ""
+                    if path:
+                        semgrep_files.add(path)
+            
+            if self.context.surface and semgrep_files:
+                original_len = len(self.context.surface.entry_points)
+                
+                # Keep entry points that are NOT in already-infected files
+                filtered_eps = []
+                for ep in self.context.surface.entry_points:
+                    ep_path = ep.code_location.split(":")[0] if ep.code_location else ""
+                    if ep_path not in semgrep_files:
+                        filtered_eps.append(ep)
+                        
+                self.context.surface.entry_points = filtered_eps
+                logger.info(
+                    f"Token Saver: Removed {original_len - len(filtered_eps)} entry points "
+                    f"that were already caught by Semgrep."
+                )
+
             try:
                 from .agents.threat_modeler import ThreatModeler
                 modeler = ThreatModeler()
@@ -461,25 +525,14 @@ class Orchestrator:
                 logger.info("No findings to verify.")
                 return
 
-        # --- Burp MCP availability check (once per run) ---
-        from .adapters.burp_adapter import BurpAdapter
-        burp = BurpAdapter()
-        burp_online = await burp.is_available()
-
-        if burp_online:
-            version = await burp.get_mcp_version()
-            logger.info(
-                f"[Verifier] Burp Suite MCP v{version} detected — "
-                f"HTTP-level findings will use Burp for verification"
-            )
-        else:
-            logger.warning(
-                "[Verifier] Burp Suite MCP not available — "
-                "all findings fall back to Docker ISOLATED sandbox"
-            )
+        # --- Native Python HTTP Verification ---
+        logger.info(
+            "[Verifier] Using native HttpVerifier for HTTP-level findings. "
+            "Inconclusive checks will automatically fall back to Docker Sandbox."
+        )
 
         # Cache on verifier so _select_mode() works correctly per-finding
-        self.verifier._burp_available = burp_online
+        self.verifier._http_available = True
 
         # Bridge Sync -> Async Batch Verification
         try:

@@ -41,17 +41,21 @@ CWE_TEMPLATE_MAP = {
     1321: "prototype_pollution.py",
 }
 
+# Non-crash CWEs: exit_code == 0 is NOT sufficient proof — need LLM stdout evaluation.
+# IDOR, Race Condition, Business Logic, Crypto Weakness, Auth Bypass, AuthZ, CSRF, Info Exposure
+LOGIC_CWES: set = {639, 362, 840, 310, 287, 862, 352, 200}
+
 # ---------------------------------------------------------------------------
 # Verification routing
 # ---------------------------------------------------------------------------
 
 class VerificationMode(str, Enum):
     """Controls which verification engine handles a finding."""
-    BURP_MCP = "burp_mcp"   # HTTP proxy — real requests, timing, OOB
-    DOCKER   = "docker"     # --network none sandbox — code-level execution
+    HTTP_NATIVE = "http_native"  # Native python requests, curl equivalent logs
+    DOCKER   = "docker"          # --network none sandbox — code-level execution
 
-# CWE IDs routed to Burp MCP (HTTP-level vulns)
-BURP_MODE_CWES: set = {89, 79, 918, 639, 22, 434, 352, 862, 287}
+# CWE IDs routed to native HTTP Verifier
+HTTP_MODE_CWES: set = {89, 79, 918, 639, 22, 434, 352, 862, 287}
 
 # Trust boundary → fallback template
 BOUNDARY_TEMPLATE_MAP = {
@@ -91,22 +95,22 @@ class Verifier:
     def __init__(self, llm: LLMGateway, sandbox: SandboxExecutor = None):
         self.llm = llm
         self.sandbox = sandbox or SandboxExecutor()
-        self._burp_available: bool = False   # Set by Orchestrator before verify_batch
+        self._http_available: bool = True   # Native HTTP checks are always safe/available
 
-        # Lazy-initialise BurpVerifier to avoid circular imports at module load
-        self._burp_verifier = None
+        # Lazy-initialise HttpVerifier to avoid circular imports at module load
+        self._http_verifier = None
         self.templates_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             "templates", "poc",
         )
 
     @property
-    def burp_verifier(self):
-        if self._burp_verifier is None:
-            from ..agents.burp_verifier import BurpVerifier
-            from ..adapters.burp_adapter import BurpAdapter
-            self._burp_verifier = BurpVerifier(BurpAdapter())
-        return self._burp_verifier
+    def http_verifier(self):
+        if self._http_verifier is None:
+            from ..agents.http_verifier import HttpVerifier
+            from ..adapters.http_adapter import HttpAdapter
+            self._http_verifier = HttpVerifier(HttpAdapter())
+        return self._http_verifier
 
     async def verify_batch(
         self,
@@ -141,12 +145,16 @@ class Verifier:
             f"[mode={mode}, path={repo_path or 'primary'}]..."
         )
 
-        # --- BURP MCP path (HTTP-level vulns) ---
-        if mode == VerificationMode.BURP_MCP:
-            return await self.burp_verifier.verify(finding, target_url)
+        # --- NATIVE HTTP path (HTTP-level vulns) ---
+        if mode == VerificationMode.HTTP_NATIVE:
+            vuln = await self.http_verifier.verify(finding, target_url)
+            if vuln.status != ConfirmedStatus.INCONCLUSIVE:
+                return vuln
+                
+            logger.info(f"[{finding.id}] HttpVerifier INCONCLUSIVE. Escalating to Docker Sandbox via LLM.")
+            mode = VerificationMode.DOCKER
 
-        # --- DOCKER path (code-level vulns, unchanged) ---
-        # 1. Select template via 3-tier fallback
+        # --- DOCKER path ---
         template_name = self._select_template(finding)
         if not template_name:
             logger.warning(f"No suitable PoC template for {finding.description}")
@@ -159,24 +167,39 @@ class Verifier:
                 severity_adjustment=None,
             )
 
-        # 2. Generate PoC script via LLM
-        poc_script = self._generate_poc(
-            template_name, finding, target_url or "http://localhost:8080"
-        )
-
-        # 3. Execute with retry loop
+        cwe_id = self._extract_cwe_id(finding)
+        is_logic_bug = cwe_id in LOGIC_CWES
         MAX_RETRIES = 3
         current_error = None
+        logic_failure_hint = ""  # Feedback from LLM evaluator for smarter retries
 
         for attempt in range(1, MAX_RETRIES + 1):
             logger.info(f"  > Verification attempt {attempt} for {finding.id}")
+
+            # Generate PoC — inject previous logic failure hint for smarter retries
+            poc_script = self._generate_poc(
+                template_name, finding,
+                target_url or "http://localhost:8080",
+                extra_context=logic_failure_hint
+            )
 
             exit_code, stdout, stderr = await self._run_sandbox(
                 poc_script, repo_path=repo_path
             )
 
-            if exit_code == 0:
-                logger.info("  ✅ Vulnerability CONFIRMED! (Exit Code 0)")
+            # ────────────────────────────────────────────────────────────────
+            # 3-State Decision Logic
+            # ────────────────────────────────────────────────────────────────
+
+            # State 1: Hard Fail — script itself crashed or errored
+            if exit_code != 0:
+                current_error = f"Exit Code: {exit_code}\nStderr: {stderr}\nStdout: {stdout}"
+                logger.warning(f"  ❌ Hard Fail (exit {exit_code}): {stderr.strip()[:200]}")
+                continue
+
+            # State 2: Binary Bug — exit 0 AND not a logic bug → CONFIRMED directly
+            if not is_logic_bug:
+                logger.info("  ✅ Vulnerability CONFIRMED! (Binary Bug — Exit Code 0)")
                 return VerifiedVuln(
                     finding_id=finding.id,
                     status=ConfirmedStatus.CONFIRMED,
@@ -185,18 +208,51 @@ class Verifier:
                     evidence=f"PoC Successful. Output: {stdout[:200]}",
                     severity_adjustment=FindingSeverity.CRITICAL,
                 )
-            else:
-                current_error = (
-                    f"Exit Code: {exit_code}\nStderr: {stderr}\nStdout: {stdout}"
+
+            # State 3: Logic Bug — exit 0 BUT need LLM to evaluate stdout
+            logger.info(f"  🔍 Logic Bug detected (CWE-{cwe_id}). Routing stdout to LLM Evaluator...")
+            try:
+                verdict_raw = self.llm.evaluate_poc_output(
+                    cwe_id=str(cwe_id),
+                    description=finding.description,
+                    poc_script=poc_script,
+                    stdout=stdout,
+                    target_data=finding.metadata.get("target_data", "")
                 )
-                logger.warning(f"  ❌ PoC Failed: {stderr.strip()[:200]}")
+                verdict = verdict_raw.strip().upper()[:3]  # Normalize: YES/NO/YES\n/yes./etc.
+
+                if verdict == "YES":
+                    logger.info("  ✅ [Evaluator] LLM judged PoC as SUCCESS based on stdout analysis.")
+                    return VerifiedVuln(
+                        finding_id=finding.id,
+                        status=ConfirmedStatus.CONFIRMED,
+                        poc={"type": "python", "content": poc_script},
+                        runtime_output=stdout,
+                        evidence=f"LLM Evaluator confirmed exploit success. Output: {stdout[:300]}",
+                        severity_adjustment=FindingSeverity.CRITICAL,
+                    )
+                else:
+                    logger.info("  ❌ [Evaluator] LLM judged PoC as FAILURE based on stdout analysis.")
+                    # Provide reasoning context to next-attempt PoC generation
+                    logic_failure_hint = (
+                        f"Previous attempt FAILED. Stdout showed failure state: '{stdout[:300]}'. "
+                        f"The exploit did NOT succeed (LLM verdict: NO). "
+                        f"Use a DIFFERENT attack strategy or payload on the next attempt."
+                    )
+                    current_error = f"LLM Evaluator: exploit did not succeed.\nStdout: {stdout[:300]}"
+                    continue
+
+            except Exception as eval_err:
+                logger.warning(f"  ⚠️ LLM Evaluator failed ({eval_err}). Treating as INCONCLUSIVE.")
+                current_error = f"Evaluator error: {eval_err}"
+                continue
 
         return VerifiedVuln(
             finding_id=finding.id,
             status=ConfirmedStatus.REJECTED,
-            poc={"type": "python", "content": poc_script},
+            poc={"type": "python", "content": poc_script if 'poc_script' in dir() else ""},
             runtime_output=current_error,
-            evidence="PoC failed to verify vulnerability after retries.",
+            evidence="PoC failed to verify vulnerability after all retries.",
             severity_adjustment=None,
         )
 
@@ -234,12 +290,12 @@ class Verifier:
     def _select_mode(self, finding: StaticFinding) -> VerificationMode:
         """
         Determine which engine handles this finding.
-        Burp MCP if:  CWE is in BURP_MODE_CWES  AND  Burp is marked available.
-        Otherwise:    Docker (safe default).
+        HTTP_NATIVE if CWE is in HTTP_MODE_CWES.
+        Otherwise: Docker (safe fallback).
         """
         cwe_id = self._extract_cwe_id(finding)
-        if self._burp_available and cwe_id in BURP_MODE_CWES:
-            return VerificationMode.BURP_MCP
+        if getattr(self, '_http_available', True) and cwe_id in HTTP_MODE_CWES:
+            return VerificationMode.HTTP_NATIVE
         return VerificationMode.DOCKER
 
     def _extract_cwe_id(self, finding: StaticFinding) -> Optional[int]:
@@ -266,6 +322,7 @@ class Verifier:
         template_name: str,
         finding: StaticFinding,
         target_url: str,
+        extra_context: str = "",
     ) -> str:
         """Ask LLM to generate PoC based on template + finding context."""
         template_path = os.path.join(self.templates_dir, template_name)
@@ -278,6 +335,10 @@ class Verifier:
                 f"# Target URL: {target_url}\n"
                 f"# Location: {finding.location}"
             )
+
+        # Inject logic failure feedback for smart retries
+        if extra_context:
+            template_content += f"\n\n# PREVIOUS ATTEMPT FEEDBACK:\n# {extra_context}"
 
         cwe_id = "UNKNOWN"
         if finding.cwe_details:

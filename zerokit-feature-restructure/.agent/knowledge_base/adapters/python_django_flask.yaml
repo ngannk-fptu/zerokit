@@ -1,7 +1,12 @@
+priority: 80
 framework: django-flask
 language: python
 description: "Security adapter for Django and Flask web applications"
 
+detection:
+  extensions: [".py"]
+  dependency_files: ["requirements.txt", "Pipfile", "pyproject.toml", "setup.py"]
+  keywords: ["django", "flask"]
 sources:
   - method: "request.args"
     framework: flask

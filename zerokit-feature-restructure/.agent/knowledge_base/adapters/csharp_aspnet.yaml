@@ -1,6 +1,12 @@
-framework: aspnet-core
+priority: 85
+framework: aspnet
 language: csharp
-description: "Security adapter for ASP.NET Core / MVC / Web API applications"
+description: "Security adapter for C# ASP.NET Core applications"
+
+detection:
+  extensions: [".cs"]
+  dependency_files: ["*.csproj", "packages.config"]
+  keywords: ["Microsoft.AspNetCore", "System.Web"]
 
 sources:
   - annotation: "[FromBody]"

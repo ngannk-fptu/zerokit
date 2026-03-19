@@ -13,23 +13,25 @@ Each query outputs JSON with: vulnerability_type, file, line, code, function, se
 
 # =============================================================================
 # Helper: standard output format for taint queries
+# IMPORTANT: vulnType and severity are injected via Python .format() BEFORE
+# passing to Joern, so Scala never sees undefined variables.
 # =============================================================================
-_TAINT_OUTPUT = """
-flows.map { flow =>
+_TAINT_OUTPUT_TEMPLATE = """
+flows.map {{ flow =>
   val src = flow.elements.head
   val snk = flow.elements.last
   Map(
-    "vulnerability_type" -> vulnType,
+    "vulnerability_type" -> "{vuln_type}",
     "file" -> snk.file.name.headOption.getOrElse("unknown"),
     "line" -> snk.lineNumber.getOrElse(-1),
     "code" -> snk.code,
     "function" -> snk.method.name,
     "source_code" -> src.code,
     "source_line" -> src.lineNumber.getOrElse(-1),
-    "severity" -> severity,
-    "description" -> s"Taint flow: ${src.code} → ${snk.code}"
+    "severity" -> "{severity}",
+    "description" -> s"Taint flow: ${{src.code}} \u2192 ${{snk.code}}"
   )
-}.toJson
+}}.toJson
 """
 
 # =============================================================================
@@ -194,179 +196,158 @@ doubleFreeCandidates.flatMap { case (varName, calls) =>
 }.toJson
 """
 
-# =============================================================================
-# PHP QUERIES (taint analysis for web vulnerabilities)
-# =============================================================================
+# ---------------------------------------------------------------------------
+# FIX: PHP superglobals ($_ GET, $_POST, etc.) are IDENTIFIERS in Joern's CPG,
+# NOT function calls. Using cpg.call.name would return 0 results.
+# FIX: Use raw strings (r""") to prevent Python interpreter from consuming
+# backslashes before passing the regex to Scala/Joern.
+# ---------------------------------------------------------------------------
 
-PHP_SQLI_TAINT = """
-// PHP SQL Injection: $_GET/$_POST/$_REQUEST → query/execute (no prepare)
-val source = cpg.call.name(".*\\\\$_(GET|POST|REQUEST|COOKIE).*").l
-val sink = cpg.call.name(".*query.*|.*execute.*").filterNot(_.code.matches(".*prepare.*")).l
-val vulnType = "SQL Injection (PHP)"
-val severity = "CRITICAL"
+PHP_SQLI_TAINT = r"""
+// PHP SQL Injection: $_GET/$_POST/$_REQUEST/$_COOKIE → query/execute (no prepare)
+val source = cpg.identifier.name("_GET|_POST|_REQUEST|_COOKIE").l
+val sink = cpg.call.name("query|execute|db_query|mysql_query").filterNot(_.code.matches(".*prepare.*|.*PDO.*prepare.*")).l
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="SQL Injection (PHP)", severity="CRITICAL")
 
-PHP_XSS_TAINT = """
+PHP_XSS_TAINT = r"""
 // PHP XSS: $_GET/$_POST → echo/print without esc_html/htmlspecialchars
-val source = cpg.call.name(".*\\\\$_(GET|POST|REQUEST).*").l
+val source = cpg.identifier.name("_GET|_POST|_REQUEST").l
 val sink = cpg.call.name("echo|print|print_r").filterNot { call =>
   call.argument.code.exists(c =>
     c.contains("esc_html") || c.contains("esc_attr") ||
     c.contains("htmlspecialchars") || c.contains("htmlentities")
   )
 }.l
-val vulnType = "Cross-Site Scripting (PHP)"
-val severity = "HIGH"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Cross-Site Scripting (PHP)", severity="HIGH")
 
-PHP_CMDI_TAINT = """
+PHP_CMDI_TAINT = r"""
 // PHP Command Injection: $_GET/$_POST → system/exec/passthru/shell_exec
-val source = cpg.call.name(".*\\\\$_(GET|POST|REQUEST).*").l
+val source = cpg.identifier.name("_GET|_POST|_REQUEST").l
 val sink = cpg.call.name("system|exec|passthru|shell_exec|popen|proc_open").l
-val vulnType = "Command Injection (PHP)"
-val severity = "CRITICAL"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Command Injection (PHP)", severity="CRITICAL")
 
-PHP_PATH_TRAVERSAL = """
+PHP_PATH_TRAVERSAL = r"""
 // PHP Path Traversal: $_GET/$_POST → file_get_contents/include/require/fopen
-val source = cpg.call.name(".*\\\\$_(GET|POST|REQUEST).*").l
+val source = cpg.identifier.name("_GET|_POST|_REQUEST").l
 val sink = cpg.call.name("file_get_contents|file_put_contents|include|require|include_once|require_once|fopen|readfile|unlink").l
-val vulnType = "Path Traversal (PHP)"
-val severity = "HIGH"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Path Traversal (PHP)", severity="HIGH")
 
 # =============================================================================
 # JAVA QUERIES (taint analysis)
+# FIX: Use raw strings to prevent Python from mangling backslash-heavy patterns.
+# FIX: ProcessBuilder uses "<init>" which needs proper raw-string preservation.
 # =============================================================================
 
-JAVA_SQLI_TAINT = """
+JAVA_SQLI_TAINT = r"""
 // Java SQLi: getParameter → Statement.execute/executeQuery/executeUpdate
 val source = cpg.call.name("getParameter|getHeader|getQueryString").l
-val sink = cpg.call.name("execute|executeQuery|executeUpdate|executeUpdate").where(_.receiver.code(".*Statement.*")).l
-val vulnType = "SQL Injection (Java)"
-val severity = "CRITICAL"
+val sink = cpg.call.name("execute|executeQuery|executeUpdate").where(_.receiver.code(".*Statement.*")).l
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="SQL Injection (Java)", severity="CRITICAL")
 
-JAVA_CMDI_TAINT = """
+JAVA_CMDI_TAINT = r"""
 // Java CMDi: getParameter → Runtime.exec / ProcessBuilder
 val source = cpg.call.name("getParameter|getHeader").l
-val sink = cpg.call.name("exec").where(_.receiver.code(".*Runtime.*")).l ++ cpg.call.name("<init>").where(_.typeFullName(".*ProcessBuilder.*")).l
-val vulnType = "Command Injection (Java)"
-val severity = "CRITICAL"
+val runtimeSinks = cpg.call.name("exec").where(_.receiver.code(".*Runtime.*")).l
+val processSinks = cpg.call.name("start").where(_.receiver.typeFullName(".*ProcessBuilder.*")).l
+val sink = runtimeSinks ++ processSinks
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Command Injection (Java)", severity="CRITICAL")
 
-JAVA_DESERIALIZATION = """
+JAVA_DESERIALIZATION = r"""
 // Java Insecure Deserialization: input stream → ObjectInputStream.readObject
 val source = cpg.call.name("getInputStream|getReader").l
 val sink = cpg.call.name("readObject|readUnshared").l
-val vulnType = "Insecure Deserialization (Java)"
-val severity = "CRITICAL"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Insecure Deserialization (Java)", severity="CRITICAL")
 
-JAVA_XXE = """
+JAVA_XXE = r"""
 // Java XXE: input → DocumentBuilder.parse / SAXParser.parse without secure features
 val source = cpg.call.name("getInputStream|getReader|getParameter").l
 val sink = cpg.call.name("parse").where(_.receiver.code(".*DocumentBuilder.*|.*SAXParser.*|.*XMLReader.*")).l
-val vulnType = "XML External Entity (Java)"
-val severity = "HIGH"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="XML External Entity (Java)", severity="HIGH")
 
 # =============================================================================
 # JAVASCRIPT QUERIES (taint analysis — uses jssrc frontend)
+# FIX: cpg.fieldAccess was removed in Joern 1.x. Use cpg.call.code for innerHTML.
+# FIX: Use raw strings to avoid Python double-escaping the dot-access patterns.
 # =============================================================================
 
-JS_SQLI_TAINT = """
+JS_SQLI_TAINT = r"""
 // JS SQLi: req.query/req.body/req.params → db.query/execute/raw
-val source = cpg.call.code(".*req\\\\.(query|body|params|cookies).*").l
+val source = cpg.call.code(".*req\.(query|body|params|cookies).*").l
 val sink = cpg.call.name("query|execute|raw").l
-val vulnType = "SQL Injection (JavaScript)"
-val severity = "CRITICAL"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="SQL Injection (JavaScript)", severity="CRITICAL")
 
-JS_XSS_DOM = """
-// JS DOM XSS: source → innerHTML/document.write/eval
-val source = cpg.call.code(".*req\\\\.(query|body|params).*").l ++ cpg.call.code(".*location\\\\.(hash|search|href).*").l
-val sink = cpg.fieldAccess.code(".*innerHTML.*").l ++ cpg.call.name("document\\\\.write|eval").l
-val vulnType = "DOM Cross-Site Scripting (JavaScript)"
-val severity = "HIGH"
+JS_XSS_DOM = r"""
+// JS DOM XSS: user input → innerHTML assignment / document.write / eval
+// FIX: Use cpg.call.code for innerHTML sink — old API was removed in Joern 1.x
+val source = cpg.call.code(".*req\.(query|body|params).*").l ++ cpg.call.code(".*location\.(hash|search|href).*").l
+val sink = cpg.call.name("eval").l ++
+           cpg.call.name("write").where(_.receiver.code(".*document.*")).l ++
+           cpg.call.code(".*\.innerHTML.*=.*").l
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="DOM Cross-Site Scripting (JavaScript)", severity="HIGH")
 
-JS_CMDI_TAINT = """
+JS_CMDI_TAINT = r"""
 // JS CMDi: req.query/body → child_process.exec/execSync/spawn
-val source = cpg.call.code(".*req\\\\.(query|body|params).*").l
-val sink = cpg.call.name("exec|execSync|spawn|spawnSync").where(_.receiver.code(".*child_process.*|.*require.*")).l
-val vulnType = "Command Injection (JavaScript)"
-val severity = "CRITICAL"
+val source = cpg.call.code(".*req\.(query|body|params).*").l
+val sink = cpg.call.name("exec|execSync|spawn|spawnSync").l
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Command Injection (JavaScript)", severity="CRITICAL")
 
-JS_SSRF = """
+JS_SSRF = r"""
 // JS SSRF: req input → fetch/axios/http.request with user-controlled URL
-val source = cpg.call.code(".*req\\\\.(query|body|params).*").l
+val source = cpg.call.code(".*req\.(query|body|params).*").l
 val sink = cpg.call.name("fetch|get|post|request").l
-val vulnType = "Server-Side Request Forgery (JavaScript)"
-val severity = "HIGH"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Server-Side Request Forgery (JavaScript)", severity="HIGH")
 
-JS_PROTOTYPE_POLLUTION = """
+JS_PROTOTYPE_POLLUTION = r"""
 // JS Prototype Pollution: dynamic property assignment from user input
-val source = cpg.call.code(".*req\\\\.(query|body).*").l
+val source = cpg.call.code(".*req\.(query|body).*").l
 val sink = cpg.call.name("assign|merge|extend|defaultsDeep").l
-val vulnType = "Prototype Pollution (JavaScript)"
-val severity = "HIGH"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Prototype Pollution (JavaScript)", severity="HIGH")
 
 # =============================================================================
 # PYTHON QUERIES (taint analysis)
+# FIX: Use raw strings to avoid \\\\. becoming garbled regex in Scala.
 # =============================================================================
 
-PY_SQLI_TAINT = """
+PY_SQLI_TAINT = r"""
 // Python SQLi: request.args/form/GET/POST → cursor.execute (no parameterized)
-val source = cpg.call.code(".*request\\\\.(args|form|GET|POST|values|json).*").l
+val source = cpg.call.code(".*request\.(args|form|GET|POST|values|json).*").l
 val sink = cpg.call.name("execute|executemany|raw").l
-val vulnType = "SQL Injection (Python)"
-val severity = "CRITICAL"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="SQL Injection (Python)", severity="CRITICAL")
 
-PY_CMDI_TAINT = """
+PY_CMDI_TAINT = r"""
 // Python CMDi: request input → os.system/subprocess.call/Popen
-val source = cpg.call.code(".*request\\\\.(args|form|GET|POST).*").l
-val sink = cpg.call.name("system|popen").l ++ cpg.call.code(".*subprocess\\\\.(call|run|Popen|check_output).*").l
-val vulnType = "Command Injection (Python)"
-val severity = "CRITICAL"
+val source = cpg.call.code(".*request\.(args|form|GET|POST).*").l
+val sink = cpg.call.name("system|popen").l ++ cpg.call.code(".*subprocess\.(call|run|Popen|check_output).*").l
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Command Injection (Python)", severity="CRITICAL")
 
-PY_SSTI = """
+PY_SSTI = r"""
 // Python SSTI: request input → render_template_string/Template/eval/exec
-val source = cpg.call.code(".*request\\\\.(args|form|GET|POST).*").l
-val sink = cpg.call.name("render_template_string|eval|exec").l ++ cpg.call.code(".*Template\\\\(.*").l
-val vulnType = "Server-Side Template Injection (Python)"
-val severity = "CRITICAL"
+val source = cpg.call.code(".*request\.(args|form|GET|POST).*").l
+val sink = cpg.call.name("render_template_string|eval|exec").l ++ cpg.call.code(".*Template\(.*").l
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Server-Side Template Injection (Python)", severity="CRITICAL")
 
-PY_PATH_TRAVERSAL = """
+PY_PATH_TRAVERSAL = r"""
 // Python Path Traversal: request input → open/read/send_file without sanitization
-val source = cpg.call.code(".*request\\\\.(args|form|GET|POST).*").l
+val source = cpg.call.code(".*request\.(args|form|GET|POST).*").l
 val sink = cpg.call.name("open|send_file|send_from_directory").l
-val vulnType = "Path Traversal (Python)"
-val severity = "HIGH"
 val flows = sink.reachableByFlows(source).l
-""" + _TAINT_OUTPUT
+""" + _TAINT_OUTPUT_TEMPLATE.format(vuln_type="Path Traversal (Python)", severity="HIGH")
 
 
 # =============================================================================

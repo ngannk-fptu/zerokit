@@ -1,7 +1,12 @@
+priority: 70
 framework: express
 language: javascript
-description: "Security adapter for Express.js / Next.js / Koa applications"
+description: "Security adapter for Node.js Express applications"
 
+detection:
+  extensions: [".js", ".ts"]
+  dependency_files: ["package.json", "yarn.lock"]
+  keywords: ["express"]
 sources:
   - method: "req.body"
     description: "Parsed HTTP request body (body-parser)"

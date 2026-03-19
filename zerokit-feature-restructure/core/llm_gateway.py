@@ -10,7 +10,6 @@ load_dotenv()
 from .llm_cache import LLMCache
 from .token_tracker import TokenTracker
 from .prompter import Prompter
-from .adapters.antigravity_adapter import AntigravityAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -21,64 +20,91 @@ class LLMGateway:
     """
     
     def __init__(self):
-        # Strict enforcement: Always use antigravity
-        self.provider = "antigravity"
         self.debug = os.getenv("LLM_DEBUG", "false").lower() == "true"
+        
+        # Load Fallback Architecture (e.g. "antigravity,openai")
+        chain_env = os.getenv("LLM_FALLBACK_CHAIN", "antigravity,openai")
+        self.fallback_chain = [p.strip().lower() for p in chain_env.split(",") if p.strip()]
         
         # Initialize subsystems
         self.cache = LLMCache()
         self.tracker = TokenTracker()
         self.prompter = Prompter()
         
-        # Initialize Antigravity Adapter
-        self.adapter = AntigravityAdapter(
-            queue_dir=os.getenv("ANTIGRAVITY_QUEUE_DIR", ".agent/prompts/queue"),
-            response_dir=os.getenv("ANTIGRAVITY_RESPONSE_DIR", ".agent/prompts/responses"),
-            archive_dir=os.getenv("ANTIGRAVITY_ARCHIVE_DIR", ".agent/prompts/archive"),
-            tracker=self.tracker,
-            timeout=int(os.getenv("ANTIGRAVITY_TIMEOUT", "60"))
-        )
+        # Lazy Load Adapter Registry
+        self._adapters_cache = {}
             
-        logger.info(f"LLMGateway initialized in STRICT Antigravity Worker API mode")
+        logger.info(f"LLMGateway initialized with Fallback Chain: {self.fallback_chain}")
+
+    def _get_adapter(self, provider_name: str):
+        """Lazy loads and caches adapters based on string name."""
+        if provider_name in self._adapters_cache:
+            return self._adapters_cache[provider_name]
+            
+        if provider_name == "antigravity":
+            from .adapters.antigravity_adapter import AntigravityAdapter
+            adapter = AntigravityAdapter(
+                queue_dir=os.getenv("ANTIGRAVITY_QUEUE_DIR", ".agent/prompts/queue"),
+                response_dir=os.getenv("ANTIGRAVITY_RESPONSE_DIR", ".agent/prompts/responses"),
+                archive_dir=os.getenv("ANTIGRAVITY_ARCHIVE_DIR", ".agent/prompts/archive"),
+                tracker=self.tracker,
+                timeout=int(os.getenv("ANTIGRAVITY_TIMEOUT", "60"))
+            )
+        elif provider_name in ["openai", "groq"]:
+            from .adapters.openai_adapter import OpenAIAdapter
+            adapter = OpenAIAdapter()
+        else:
+            raise ValueError(f"Unknown LLM Provider mapping: {provider_name}")
+            
+        self._adapters_cache[provider_name] = adapter
+        return adapter
 
     def _execute_prompt(self, agent: str, method: str, **variables) -> str:
         """
-        Helper to load prompt, render it, check cache, and call Antigravity adapter.
+        Loads prompt, checks cache, and dynamically drops down the Fallback Chain until success.
         """
-        # 1. Load Template
+        # 1. Load Template & Render
         template = self.prompter.load(agent, method)
-        
-        # 2. Render Prompt
         prompt_text = self.prompter.render(template, **variables)
         
-        # 3. Get Config (Model, Temp, etc.)
-        config = self.prompter.get_config(template, self.provider)
-        model_name = config.get("model", "antigravity")
+        errors = []
         
-        if self.debug:
-            logger.debug(f"Executing {agent}/{method} (v{template.version})")
-            logger.debug(f"Prompt Config: {config}")
-        
-        # 4. Check Cache
-        cached = self.cache.get(prompt_text, model_name)
-        if cached:
-            return cached
+        # Try every provider in the configured Fallback Chain
+        for provider in self.fallback_chain:
+            # 2. Get Config specialized for this provider
+            config = self.prompter.get_config(template, provider)
+            model_name = config.get("model", provider)
             
-        # 5. Call Antigravity Adapter
-        try:
-            # Pass agent and method through config for Antigravity
-            config["agent"] = agent
-            config["method"] = method
-            response = self.adapter.call(prompt_text, config)
+            if self.debug:
+                logger.debug(f"Attempting {provider} for {agent}/{method} via Model {model_name}")
             
-            # 6. Cache Response
-            self.cache.set(prompt_text, response, 0, 0.0, model_name)
-            
-            return response
-        
-        except Exception as e:
-            logger.error(f"Antigravity Execution Failed: {e}")
-            raise
+            # 3. Check Cache
+            cached = self.cache.get(prompt_text, model_name)
+            if cached:
+                if self.debug: logger.debug(f"Cache hit on {model_name}")
+                return cached
+                
+            # 4. Invoke the Adapter
+            try:
+                adapter = self._get_adapter(provider)
+                # Pass context to antigravity
+                config["agent"] = agent
+                config["method"] = method
+                
+                response = adapter.call(prompt_text, config)
+                
+                # Cache response on success
+                self.cache.set(prompt_text, response, 0, 0.0, model_name)
+                return response
+                
+            except Exception as e:
+                logger.warning(f"[Fallback Triggered] Model '{provider}' failed: {e}")
+                errors.append(f"{provider}: {str(e)}")
+                continue # Try the next provider in the chain
+                
+        # If the loop exhausts the chain without returning, the system completely failed.
+        logger.error(f"All LLM Providers in the Fallback Chain failed. Errors: {errors}")
+        raise RuntimeError(f"LLM Gateway Execution Failed. Chain exhausted: {errors}")
 
     def generate_semgrep_rule(self, hypothesis_id: str, description: str, cwe_id: str, language: str, source: str, sink: str, trust_boundary: str, sanitizers: str = "", sanitizer_bypass: str = "", target: str = "", context: str = "") -> str:
         return self._execute_prompt("detector", "generate_rule", 
@@ -213,6 +239,29 @@ class LLMGateway:
                                   language=language,
                                   cwe_id=cwe_id)
                                   
+    def evaluate_poc_output(
+        self,
+        cwe_id: str,
+        description: str,
+        poc_script: str,
+        stdout: str,
+        target_data: str = ""
+    ) -> str:
+        """
+        Zero-shot LLM judge for logic bug PoCs (IDOR/Race/AuthZ).
+        Returns 'YES' (exploit succeeded) or 'NO' (exploit failed).
+        Truncates stdout to last 4000 chars to prevent token explosion.
+        """
+        truncated_stdout = stdout[-4000:] if len(stdout) > 4000 else stdout
+        return self._execute_prompt(
+            "verifier", "evaluate_poc",
+            cwe_id=cwe_id,
+            description=description,
+            poc_script=poc_script,
+            stdout=truncated_stdout,
+            target_data=target_data
+        )
+
     def get_usage_stats(self) -> dict:
         return {
             "tracker": self.tracker.get_current_usage(),

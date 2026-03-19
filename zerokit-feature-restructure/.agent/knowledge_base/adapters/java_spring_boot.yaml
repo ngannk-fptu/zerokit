@@ -1,6 +1,12 @@
-framework: spring-boot
+priority: 90
+framework: spring_boot
 language: java
-description: "Security adapter for Spring Boot / Spring MVC applications"
+description: "Security adapter for Java Spring Boot applications"
+
+detection:
+  extensions: [".java", ".kt"]
+  dependency_files: ["pom.xml", "build.gradle"]
+  keywords: ["spring-boot", "org.springframework"]
 
 sources:
   - annotation: "@RequestParam"

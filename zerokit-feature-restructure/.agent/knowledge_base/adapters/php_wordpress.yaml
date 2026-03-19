@@ -1,0 +1,48 @@
+priority: 60
+framework: wordpress
+language: php
+description: "Security adapter for PHP WordPress"
+detection:
+  extensions: [".php"]
+  dependency_files: ["wp-config.php", "composer.json"]
+  keywords: ["wordpress", "wpackagist"]
+
+sources:
+  - method: "$_GET"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "$_POST"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "$_REQUEST"
+    cwe_concern: [CWE-89, CWE-79]
+  - method: "$_COOKIE"
+    cwe_concern: [CWE-89, CWE-79]
+
+sinks:
+  - function: "wpdb->query("
+    severity: CRITICAL
+    cwe: CWE-89
+  - function: "wpdb->get_results("
+    severity: CRITICAL
+    cwe: CWE-89
+  - function: "echo "
+    severity: HIGH
+    cwe: CWE-79
+  - function: "print "
+    severity: HIGH
+    cwe: CWE-79
+  - function: "eval("
+    severity: CRITICAL
+    cwe: CWE-94
+  - function: "system("
+    severity: CRITICAL
+    cwe: CWE-78
+  - function: "exec("
+    severity: CRITICAL
+    cwe: CWE-78
+
+sanitizers:
+  - function: "esc_html("
+  - function: "esc_attr("
+  - function: "wpdb->prepare("
+  - function: "sanitize_text_field("
+  - function: "intval("
