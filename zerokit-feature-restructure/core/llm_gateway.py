@@ -1,6 +1,8 @@
 import logging
 import uuid
 import os
+import time
+from datetime import datetime
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -59,6 +61,40 @@ class LLMGateway:
         self._adapters_cache[provider_name] = adapter
         return adapter
 
+    def _log_audit(
+        self, agent: str, method: str, provider: str, model: str, 
+        prompt_text: str, response_text: str, duration: float, error: str = None
+    ):
+        """Saves prompt and response as a Markdown file for debug + audit trail."""
+        try:
+            audit_dir = os.path.join(os.getcwd(), ".agent", "logs", "audit")
+            os.makedirs(audit_dir, exist_ok=True)
+            
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            short_id = str(uuid.uuid4())[:6]
+            status = "ERROR" if error else "SUCCESS"
+            
+            filename = f"{timestamp}_{agent}_{method}_{status}_{short_id}.md"
+            filepath = os.path.join(audit_dir, filename)
+            
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(f"# LLM Audit Log\n")
+                f.write(f"- **Timestamp**: {datetime.now().isoformat()}\n")
+                f.write(f"- **Agent**: `{agent}`\n")
+                f.write(f"- **Prompt**: `{method}`\n")
+                f.write(f"- **Provider**: `{provider}` (Model: `{model}`)\n")
+                f.write(f"- **Status**: `{status}`\n")
+                f.write(f"- **Duration**: `{duration:.2f}s`\n\n")
+                
+                f.write(f"## Rendered Prompt\n```text\n{prompt_text}\n```\n\n")
+                
+                if error:
+                    f.write(f"## Error Details\n```text\n{error}\n```\n")
+                else:
+                    f.write(f"## LLM Response\n```text\n{response_text}\n```\n")
+        except Exception as e:
+            logger.error(f"Failed to write audit log: {e}")
+
     def _execute_prompt(self, agent: str, method: str, **variables) -> str:
         """
         Loads prompt, checks cache, and dynamically drops down the Fallback Chain until success.
@@ -85,6 +121,7 @@ class LLMGateway:
                 return cached
                 
             # 4. Invoke the Adapter
+            start_time = time.time()
             try:
                 adapter = self._get_adapter(provider)
                 # Pass context to antigravity
@@ -92,12 +129,18 @@ class LLMGateway:
                 config["method"] = method
                 
                 response = adapter.call(prompt_text, config)
+                duration = time.time() - start_time
+                
+                # Log audit trail
+                self._log_audit(agent, method, provider, model_name, prompt_text, response, duration)
                 
                 # Cache response on success
                 self.cache.set(prompt_text, response, 0, 0.0, model_name)
                 return response
                 
             except Exception as e:
+                duration = time.time() - start_time
+                self._log_audit(agent, method, provider, model_name, prompt_text, "", duration, str(e))
                 logger.warning(f"[Fallback Triggered] Model '{provider}' failed: {e}")
                 errors.append(f"{provider}: {str(e)}")
                 continue # Try the next provider in the chain
@@ -260,6 +303,22 @@ class LLMGateway:
             poc_script=poc_script,
             stdout=truncated_stdout,
             target_data=target_data
+        )
+
+    def generate_attack_chains(
+        self,
+        endpoints_summary: str,
+        security_profile: str,
+    ) -> str:
+        """
+        Cross-endpoint attack chain discovery.
+        Sends a structured endpoint summary table to the LLM for chain-of-thought
+        analysis, returning JSON array of potential multi-step exploit chains.
+        """
+        return self._execute_prompt(
+            "threat_modeler", "analyze_chains",
+            endpoints_summary=endpoints_summary,
+            security_profile=security_profile
         )
 
     def get_usage_stats(self) -> dict:

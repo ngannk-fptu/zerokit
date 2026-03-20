@@ -115,7 +115,14 @@ class ThreatModeler:
         # Sort hypotheses by priority: CRITICAL -> HIGH -> MEDIUM -> LOW
         priority_rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}
         hypotheses.sort(key=lambda h: priority_rank.get(h.metadata.get("priority", "LOW"), 99))
-        
+
+        # ── Cross-Endpoint Attack Chain Analysis ──────────────────────────
+        # After per-endpoint analysis, look at the big picture for chained exploits.
+        chain_hypotheses = self._analyze_cross_endpoint_chains(
+            hypotheses, surface, security_profile
+        )
+        hypotheses.extend(chain_hypotheses)
+
         return hypotheses
 
     def _get_reachable_sinks(self, code_graph: Dict) -> List[Dict]:
@@ -159,6 +166,116 @@ class ThreatModeler:
                 })
                 
         return reachable
+
+    # -----------------------------------------------------------------
+    # Cross-Endpoint Attack Chain Discovery
+    # -----------------------------------------------------------------
+
+    # Sensitive keywords that mark an endpoint as worth including in
+    # the cross-endpoint attack-chain analysis. Endpoints that don't
+    # match any keyword are skipped to avoid N² combinatorial explosion.
+    _CHAIN_KEYWORDS = {
+        "upload", "download", "file", "admin", "config", "auth",
+        "token", "login", "register", "password", "session",
+        "profile", "avatar", "export", "import", "debug", "log",
+        "reset", "invite", "api_key", "webhook", "callback",
+    }
+
+    def _analyze_cross_endpoint_chains(
+        self,
+        hypotheses: List[Hypothesis],
+        surface: 'AttackSurface',
+        security_profile: Optional[Any] = None,
+    ) -> List[Hypothesis]:
+        """
+        After per-endpoint hypothesis generation, aggregate all findings
+        into a structured table and ask the LLM to discover multi-step
+        exploit chains across endpoints.
+
+        Pre-filters endpoints by sensitive keywords to avoid token explosion.
+        """
+        if len(hypotheses) < 2:
+            logger.info("  [ChainAnalysis] Skipped — need ≥ 2 hypotheses for chain discovery.")
+            return []
+
+        # ── Step 1: Pre-filter — only endpoints with sensitive keywords ──
+        relevant = []
+        for h in hypotheses:
+            location_lower = h.target_code.lower()
+            description_lower = h.description.lower()
+            combined = location_lower + " " + description_lower
+            if any(kw in combined for kw in self._CHAIN_KEYWORDS):
+                relevant.append(h)
+
+        if len(relevant) < 2:
+            logger.info(f"  [ChainAnalysis] Only {len(relevant)} relevant endpoint(s) after keyword filter. Skipping.")
+            return []
+
+        logger.info(f"  [ChainAnalysis] Analyzing {len(relevant)} endpoints for cross-endpoint chains...")
+
+        # ── Step 2: Build structured summary table ──────────────────────
+        rows = ["| Endpoint | Method | Input Params | Detected Weakness | Note |",
+                "|:---|:---|:---|:---|:---|"]
+
+        for h in relevant:
+            endpoint = h.target_code.split(":")[0] if h.target_code else "Unknown"
+            method = h.metadata.get("original_entry_point_type", "UNKNOWN")
+            params = h.metadata.get("source", "Unknown")
+            weakness = h.description[:80]
+            note = h.metadata.get("llm_reasoning", "")[:60]
+            rows.append(f"| {endpoint} | {method} | {params} | {weakness} | {note} |")
+
+        table = "\n".join(rows)
+
+        # ── Step 3: Call LLM ────────────────────────────────────────────
+        profile_str = ""
+        if security_profile:
+            try:
+                profile_str = security_profile.json()
+            except Exception:
+                profile_str = str(security_profile)
+
+        try:
+            response = self.llm.generate_attack_chains(
+                endpoints_summary=table,
+                security_profile=profile_str[:2000]  # Cap profile to avoid token explosion
+            )
+        except Exception as e:
+            logger.warning(f"  [ChainAnalysis] LLM call failed: {e}")
+            return []
+
+        # ── Step 4: Parse JSON → Hypothesis objects ─────────────────────
+        from ..utils import extract_json
+        chains = extract_json(response, default=[])
+
+        chain_hypotheses = []
+        for chain in chains:
+            if not isinstance(chain, dict):
+                continue
+
+            steps = chain.get("steps", [])
+            if len(steps) < 2:
+                continue
+
+            h = Hypothesis(
+                id=str(uuid.uuid4()),
+                description=f"[CHAIN] {chain.get('chain_name', 'Multi-Endpoint Attack')}",
+                target_code="Multi-Endpoint",
+                verification_plan=chain.get("verification_plan", "Custom multi-step PoC required"),
+                is_chain=True,
+                chain_steps=steps,
+                metadata={
+                    "priority": chain.get("severity", "CRITICAL"),
+                    "confidence": chain.get("confidence", "MEDIUM"),
+                    "chain_name": chain.get("chain_name"),
+                    "is_chain": True,
+                }
+            )
+            chain_hypotheses.append(h)
+            logger.info(f"  ⛓️ Attack Chain Found: {chain.get('chain_name')} ({len(steps)} steps)")
+
+        logger.info(f"  [ChainAnalysis] Discovered {len(chain_hypotheses)} attack chain(s).")
+        return chain_hypotheses
 
     def _is_trivial(self, location: str) -> bool:
         """Skip non-code or static assets"""

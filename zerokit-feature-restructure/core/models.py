@@ -23,6 +23,8 @@ class Hypothesis(BaseModel):
     target_code: str
     verification_plan: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    is_chain: bool = False
+    chain_steps: List[Dict[str, Any]] = Field(default_factory=list)
 
 class VulnerabilityCategory(str, Enum):
     """Security vulnerability categories for pattern matching."""
