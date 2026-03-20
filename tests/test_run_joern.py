@@ -95,12 +95,17 @@ def test_run_joern_health_check_retries_then_succeeds(
         nonlocal health_attempts
         _ = timeout
         url = request if isinstance(request, str) else request.full_url
-        if url == "http://localhost:8080/":
-            health_attempts += 1
-            if health_attempts < 3:
-                raise ConnectionError("joern not ready")
-            return _response({"ok": True}, status=200)
-        if url == "http://localhost:8080/query":
+        if url == "http://localhost:8080/query-sync":
+            if not isinstance(request, str) and hasattr(request, "data") and request.data:
+                try:
+                    body = json.loads(request.data.decode("utf-8"))
+                    if "importCode" in body.get("query", ""):
+                        health_attempts += 1
+                        if health_attempts < 3:
+                            raise ConnectionError("joern not ready")
+                        return _response({"ok": True}, status=200)
+                except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
+                    pass
             return _response(
                 {
                     "stdout": "src/app.py:42:user_input reaches sink",
@@ -200,7 +205,7 @@ def test_run_joern_writes_intermediate_finding_items_for_taint_results(
         url = request if isinstance(request, str) else request.full_url
         if url == "http://localhost:8080/":
             return _response({"ok": True}, status=200)
-        if url == "http://localhost:8080/query":
+        if url == "http://localhost:8080/query-sync":
             return _response(
                 {
                     "stdout": "src/main.py:17 user_input -> subprocess.call(shell=True)",
@@ -249,7 +254,7 @@ def test_run_joern_handles_empty_taint_results(
         url = request if isinstance(request, str) else request.full_url
         if url == "http://localhost:8080/":
             return _response({"ok": True}, status=200)
-        if url == "http://localhost:8080/query":
+        if url == "http://localhost:8080/query-sync":
             return _response({"stdout": "", "stderr": ""}, status=200)
         raise AssertionError(f"Unexpected URL: {url}")
 
@@ -291,7 +296,7 @@ def test_run_joern_output_items_match_intermediate_finding_contract(
         url = request if isinstance(request, str) else request.full_url
         if url == "http://localhost:8080/":
             return _response({"ok": True}, status=200)
-        if url == "http://localhost:8080/query":
+        if url == "http://localhost:8080/query-sync":
             return _response({"stdout": "src/app.py:9 taint flow", "stderr": ""}, status=200)
         raise AssertionError(f"Unexpected URL: {url}")
 
@@ -341,9 +346,7 @@ def test_run_joern_uses_configurable_port_for_docker_and_http(
         _ = timeout
         url = request if isinstance(request, str) else request.full_url
         urls.append(url)
-        if url == "http://localhost:9090/":
-            return _response({"ok": True}, status=200)
-        if url == "http://localhost:9090/query":
+        if url == "http://localhost:9090/query-sync":
             return _response({"stdout": "", "stderr": ""}, status=200)
         raise AssertionError(f"Unexpected URL: {url}")
 
@@ -368,8 +371,7 @@ def test_run_joern_uses_configurable_port_for_docker_and_http(
     docker_run_cmd = next(cmd for cmd in commands if cmd[:3] == ["docker", "run", "-d"])
     assert "-p" in docker_run_cmd
     assert "9090:8080" in docker_run_cmd
-    assert "http://localhost:9090/" in urls
-    assert "http://localhost:9090/query" in urls
+    assert "http://localhost:9090/query-sync" in urls
 
 
 @pytest.mark.integration
