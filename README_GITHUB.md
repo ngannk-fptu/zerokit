@@ -2,8 +2,8 @@
 
 Plug-and-play skill layer that turns AI agents into whitebox pentesters.
 
-Works with Claude Code, Codex, GitHub Copilot, Antigravity, or any
-agent that can read files and run shell commands.
+Built for OpenCode first. Claude Code, Codex, and GitHub Copilot are
+secondary targets as long as they can read files and run shell commands.
 
 ## How It Works
 

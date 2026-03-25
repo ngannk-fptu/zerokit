@@ -29,8 +29,8 @@ Common failures:
 - removed proof-gate wording
 
 Remediation:
-- restore canonical phase references in `.agent/workflows/master-harness.md`
-- restore missing phase files under `.agent/workflows/phases/`
+- restore canonical phase references in `.agent/methodology/master-harness.md`
+- restore missing phase files under `.agent/methodology/phases/`
 - keep proof-gate wording present
 
 ### `check_docs_consistency.py`

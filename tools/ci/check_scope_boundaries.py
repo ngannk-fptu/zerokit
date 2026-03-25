@@ -13,7 +13,7 @@ REQUIRED_PATHS = [
     REPO_ROOT / ".agent/HARNESS_SCOPE.md",
     REPO_ROOT / ".agent/knowledge_base/ARCHITECTURE.md",
     REPO_ROOT / ".agent/knowledge_base/BLUEPRINT.md",
-    REPO_ROOT / ".agent/workflows/master-harness.md",
+    REPO_ROOT / ".agent/methodology/master-harness.md",
 ]
 
 FORBIDDEN_SKILL_DIRS = {
@@ -31,7 +31,6 @@ FORBIDDEN_ROOT_PATHS = [
     REPO_ROOT / "hunt_pipeline.py",
     REPO_ROOT / "mass_hunt.py",
 ]
-
 
 
 def fail(message: str) -> None:

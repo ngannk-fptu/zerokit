@@ -15,9 +15,9 @@ autonomous execution.
 
 ## Current Shim Responsibilities
 
-Implemented in `tools/harness/run_master_workflow.py`.
+Implemented as agent-driven methodology plus harness scripts; no standalone master workflow runner is required.
 
-- Enforces canonical phase order from `.agent/workflows/master-harness.md`.
+- Enforces canonical phase order from `.agent/methodology/master-harness.md`.
 - Initializes run directory structure under `.agent/artifacts/runs/<run_id>/`.
 - Emits deterministic placeholder artifacts aligned to artifact contract.
 - Captures phase-level status and diagnostics in `run_state.json`.

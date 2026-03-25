@@ -36,15 +36,6 @@ Example:
 python tools/harness/validate_run_artifacts.py --run-root .agent/artifacts/runs/run-20260303T120000Z
 ```
 
-## `run_master_workflow.py`
-Runs a minimal orchestration shim for the canonical master workflow and materializes phase artifact placeholders plus repository profile output.
-
-Example:
-```bash
-python tools/harness/run_master_workflow.py --target . --run-id run-20260303T120000Z
-```
-
-Dry-run:
-```bash
-python tools/harness/run_master_workflow.py --target . --run-id run-20260303T120000Z --dry-run
-```
+## Canonical Methodology
+The orchestration source of truth is `.agent/methodology/master-harness.md`.
+Harness scripts stay narrow and are called by the agent during each phase.

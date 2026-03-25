@@ -22,8 +22,8 @@ ZeroKit V3 is a well-structured whitebox pentesting harness with solid artifact 
 - The word "handoff" appears only in artifact contracts context (phase handoff = artifact exchange), not human↔agent handoff
 
 **Evidence:**
-- `master-harness.md`: Linear flow with no intervention hooks
-- `phase-04-verification-gate.md`: No human approval gate before promoting findings
+- `.agent/methodology/master-harness.md`: Linear flow with no intervention hooks
+- `.agent/methodology/phases/phase-04-verification-gate.md`: No human approval gate before promoting findings
 - No `.agent/hooks/` directory exists
 
 ### Gap Score: **CRITICAL** — Core vision missing
@@ -98,7 +98,7 @@ ZeroKit V3 is a well-structured whitebox pentesting harness with solid artifact 
 - Architecture is intentionally "runtime-agnostic" — this conflicts with OpenCode-first
 
 **Evidence:**
-- `README.md`: "Drop this repo into Claude Code, Codex, GitHub Copilot, Antigravity, or any agent runtime"
+- `README.md`: Platform messaging needed to reflect OpenCode-first positioning
 - `HARNESS_SCOPE.md`: Lists "Codex compatibility" as in-scope, no OpenCode mention
 - No OpenCode hooks structure (would be `.opencode/hooks/`)
 
@@ -186,8 +186,8 @@ Based on vision alignment impact:
 Generated: 2026-03-19  
 Analyzed Files:
 - `.agent/agent.md`
-- `.agent/workflows/master-harness.md`
-- `.agent/workflows/phases/*`
+- `.agent/methodology/master-harness.md`
+- `.agent/methodology/phases/*`
 - `.agent/artifacts/contracts/artifact_contract.json`
 - `README.md`
 - `.agent/HARNESS_SCOPE.md`

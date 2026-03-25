@@ -53,7 +53,7 @@ These are tools ZeroKit calls as subprocesses or via HTTP API — not Python dep
 | **Semgrep** | SAST pattern + taint scanning; primary detection engine | 03 | LGPL-2.1 (OSS rules free; Pro rules paid) | Declared in `pyproject.toml` tools group. `semgrep scan --json` gives normalized output. First to wire. |
 | **Gitleaks** | Secret / credential detection | 03 | MIT | Single binary, no runtime deps. `gitleaks detect --report-format json` |
 | **CodeQL** | Deep dataflow analysis for C#, Java, JS/TS, Python, Go | 03 | MIT (CLI free; Enterprise paid) | Requires `codeql database create` + `codeql query run`. Slower than Semgrep; run on high-priority targets. |
-| **Joern** | CPG: taint analysis, source-sink reachability, data flow slices | 02/03/05 | Apache 2.0 | JVM-based. Official Docker image available. Server mode (`joern --server`) exposes HTTP on `:8080`. Best tool for confirming real taint paths that Semgrep misses. See `research/joern-vs-gitnexus-analysis.md`. |
+| **Joern** | CPG: taint analysis, source-sink reachability, data flow slices | 02/03/05 | Apache 2.0 | JVM-based. Official Docker image available. Server mode (`joern --server`) exposes HTTP on `:8080`. Best tool for confirming real taint paths that Semgrep misses. See `docs/research/copilot-research-joern-vs-gitnexus-analysis.md`. |
 
 ### Phase 04 — Verification
 
@@ -283,7 +283,7 @@ The Python harness (`tools/harness/`, `tools/ci/`) uses only stdlib + pathlib. I
 
 ### Open questions
 
-1. **LLM gateway**: Phase 03 hypothesis generation and Phase 04 PoC synthesis both need an LLM. Which provider/model? The old ZeroKit2 used Gemini + Antigravity (both removed). Current harness has no LLM integration. This needs a decision before Phases 03–05 can be fully autonomous.
+1. **LLM gateway**: Phase 03 hypothesis generation and Phase 04 PoC synthesis both need an LLM. Which provider/model? A previous prototype used runtime integrations that are now retired. Current harness has no LLM integration. This needs a decision before Phases 03–05 can be fully autonomous.
 
 2. **CodeQL licensing**: The free CLI supports all target languages but the full query suite requires GitHub Advanced Security for enterprise targets. Clarify whether ZeroKit targets public or private repos.
 

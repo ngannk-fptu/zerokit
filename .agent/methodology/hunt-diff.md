@@ -2,7 +2,7 @@
 description: Specialized subflow for patch-diff and silent-fix analysis.
 ---
 
-1. Start from `workflows/master-harness.md` and complete Phase 01 first.
+1. Start from `methodology/master-harness.md` and complete Phase 01 first.
 2. Identify security-relevant historical diffs and suspicious silent fixes.
 3. Extract vulnerable pattern from pre-fix and post-fix deltas.
 4. Validate exploitability of pre-fix behavior where feasible.

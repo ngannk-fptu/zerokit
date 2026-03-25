@@ -35,7 +35,7 @@ Each confirmed finding must include:
 
 ## Harness Structure
 
-- `.agent/workflows/` -- phase methodology docs
+- `.agent/methodology/` -- phase methodology docs
 - `.agent/skills/` -- 30 pentest skill packs
 - `.agent/knowledge_base/` -- prompts, templates, references
 - `.agent/artifacts/` -- contracts, schemas, examples

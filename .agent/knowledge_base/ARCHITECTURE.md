@@ -4,7 +4,7 @@
 
 ZeroKit is a plug-and-play agent harness — a skill and knowledge layer
 that turns any capable AI agent into a whitebox pentester. The agent
-runtime (Claude Code, Codex, Copilot, Antigravity, etc.) is the
+runtime (OpenCode first, Claude Code/Codex/Copilot second) is the
 reasoning engine. ZeroKit provides what the agent needs to think and
 act like a professional pentester:
 
@@ -19,14 +19,14 @@ The agent decides what to do. Scripts are narrow tool executors.
 ## Current State
 
 This repository currently provides a harness **operating layer**:
-- workflow contracts (`.agent/workflows/`)
+- methodology contracts (`.agent/methodology/`)
 - pentest skill catalog (`.agent/skills/`)
 - knowledge contracts and prompts (`.agent/knowledge_base/`)
 - tool connectors and CI guardrails (`tools/`)
 
 ## Canonical Orchestration Surface
 
-Use `.agent/workflows/master-harness.md` as the single entrypoint.
+Use `.agent/methodology/master-harness.md` as the single entrypoint.
 
 Phase order:
 1. Intake and plan

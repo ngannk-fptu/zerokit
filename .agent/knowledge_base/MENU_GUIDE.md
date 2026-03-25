@@ -5,25 +5,25 @@ Use:
 
 ```bash
 # from repository root
-cat .agent/workflows/master-harness.md
+cat .agent/methodology/master-harness.md
 ```
 
 Treat `master-harness` as the single orchestration surface.
 
 ## Phase Files
-1. `.agent/workflows/phases/phase-01-intake-plan.md`
-2. `.agent/workflows/phases/phase-02-profile-surface.md`
-3. `.agent/workflows/phases/phase-03-threat-and-static.md`
-4. `.agent/workflows/phases/phase-04-verification-gate.md`
-5. `.agent/workflows/phases/phase-05-rca-variant-patch.md`
-6. `.agent/workflows/phases/phase-06-report-regression.md`
+1. `.agent/methodology/phases/phase-01-intake-plan.md`
+2. `.agent/methodology/phases/phase-02-profile-surface.md`
+3. `.agent/methodology/phases/phase-03-threat-and-static.md`
+4. `.agent/methodology/phases/phase-04-verification-gate.md`
+5. `.agent/methodology/phases/phase-05-rca-variant-patch.md`
+6. `.agent/methodology/phases/phase-06-report-regression.md`
 
 ## Specialized Subflows
-- `.agent/workflows/hunt-fuzz.md`
-- `.agent/workflows/hunt-deps.md`
-- `.agent/workflows/hunt-diff.md`
+- `.agent/methodology/hunt-fuzz.md`
+- `.agent/methodology/hunt-deps.md`
+- `.agent/methodology/hunt-diff.md`
 
 These subflows must still obey the master verification gate and artifact contract.
 
-## Compatibility Aliases
-Legacy routing files (for example `brainstorm`, `writing-plans`, and `hunt-taint`) are compatibility stubs and should not define independent orchestration logic.
+## Legacy Cleanup
+Deprecated compatibility aliases were removed. Use the canonical methodology files only.

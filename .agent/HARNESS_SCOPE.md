@@ -5,7 +5,7 @@ Turn any capable AI agent into a professional whitebox pentester via
 plug-and-play skills, methodology, tool connectors, and evidence contracts.
 
 ## Core Model
-The agent runtime (Claude Code, Codex, Copilot, Antigravity, etc.)
+The agent runtime (OpenCode first, Claude Code/Codex/Copilot second)
 provides reasoning. ZeroKit provides the pentest methodology and tools.
 Agent decides; scripts execute.
 
@@ -22,8 +22,8 @@ Agent decides; scripts execute.
 - Other languages only when directly needed for reachable findings
 
 ## Canonical Workflow Surface
-- `workflows/master-harness.md`
-- `workflows/phases/phase-01-intake-plan.md` ... `phase-06-report-regression.md`
+- `methodology/master-harness.md`
+- `methodology/phases/phase-01-intake-plan.md` ... `phase-06-report-regression.md`
 
 ## Hard Rules
 1. No proof, no vulnerability.

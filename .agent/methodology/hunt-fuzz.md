@@ -2,7 +2,7 @@
 description: Specialized subflow for fuzzing-focused verification.
 ---
 
-1. Start from `workflows/master-harness.md` and complete Phase 01-03 first.
+1. Start from `methodology/master-harness.md` and complete Phase 01-03 first.
 2. During Phase 04, prioritize fuzzing for parser/deserialization/input-heavy sinks.
 3. Select fuzzer approach by language:
 - .NET/Java: JVM/.NET-compatible fuzz strategies

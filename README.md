@@ -3,8 +3,8 @@
 ZeroKit V3 is a plug-and-play skill and knowledge layer that turns any
 capable AI agent into a professional whitebox pentester.
 
-Drop this repo into Claude Code, Codex, GitHub Copilot, Antigravity, or
-any agent runtime that can read files and run shell commands. The agent
+Drop this repo into OpenCode first. Claude Code, Codex, and GitHub
+Copilot are secondary targets. The agent
 gets structured pentesting methodology, tool connectors, artifact
 contracts, and domain knowledge. It provides the reasoning, context,
 and judgment -- like a human security researcher.
@@ -15,19 +15,21 @@ ZeroKit is **not** an automated scan chain. The agent decides what to
 do at each phase. Scripts are narrow tool executors the agent calls.
 
 ```
-Agent runtime (Claude Code, Codex, Copilot, etc.)
+Agent runtime (OpenCode first, other compatible runtimes second)
        |
-       | reads workflows, skills, prompts
+       | reads methodology, skills, prompts
        | invokes tool wrappers (Semgrep, Gitleaks, Joern, Docker)
        | produces and validates artifacts
        v
 ZeroKit harness layer
-  .agent/workflows/    -- methodology (6-phase pentest flow)
+  .agent/methodology/  -- methodology (6-phase pentest flow)
   .agent/skills/       -- 30 pentest skill packs
   .agent/knowledge_base/ -- prompts, templates, references
   .agent/artifacts/    -- contracts, schemas, examples
   tools/harness/       -- tool connectors, profilers, validators
   tools/ci/            -- CI guardrails
+  docs/research/       -- design notes and historical analysis
+  .opencode/hooks/     -- OpenCode integration surface
 ```
 
 ## 6-Phase Workflow
@@ -68,4 +70,4 @@ make test
 - No proof, no vulnerability.
 - Agent decides; scripts execute.
 - Artifact contracts are mandatory for phase handoff.
-- Portable across agent runtimes by design.
+- OpenCode-first, portable to compatible agent runtimes.

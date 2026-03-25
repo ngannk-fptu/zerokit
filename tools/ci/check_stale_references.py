@@ -9,6 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AGENT_DIR = REPO_ROOT / ".agent"
+DOCS_DIR = REPO_ROOT / "docs"
 
 ALLOWLIST_BY_NAME = {
     "ci_guardrails_runbook.md": "Runbook intentionally documents forbidden legacy patterns.",
@@ -52,6 +53,8 @@ def gather_scan_paths() -> list[Path]:
     paths = []
     if AGENT_DIR.exists():
         paths.extend(sorted(path for path in AGENT_DIR.rglob("*") if path.is_file()))
+    if DOCS_DIR.exists():
+        paths.extend(sorted(path for path in DOCS_DIR.rglob("*.md") if path.is_file()))
     paths.extend(sorted(REPO_ROOT.glob("*.md")))
 
     unique: list[Path] = []
