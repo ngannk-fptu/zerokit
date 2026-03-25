@@ -1,0 +1,8 @@
+{
+  "python": "3.11",
+  "semgrep": "1.60.0",
+  "gitleaks": "8.18.4",
+  "joern": "4.0.0",
+  "docker": "24.0",
+  "flask_fixture_base_image": "python:3.11-slim"
+}
