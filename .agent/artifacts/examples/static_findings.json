@@ -5,6 +5,7 @@
     {
       "id": "sf-001",
       "source": "orchestration-shim",
+      "simulated": true,
       "tool": "semgrep",
       "severity": "high",
       "path": "src/api/users.ts",

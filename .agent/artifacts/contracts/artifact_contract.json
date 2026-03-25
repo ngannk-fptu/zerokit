@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "artifacts": {
     "attack_surface": {
       "required_fields": ["run_id", "generated_at", "items"],
@@ -14,23 +14,25 @@
     },
     "static_findings": {
       "required_fields": ["run_id", "generated_at", "items"],
-      "item_required_fields": ["id", "tool", "severity", "path", "line", "evidence", "hypothesis_id"],
-      "item_optional_fields": {
-        "source": "string"
-      }
+      "item_required_fields": [
+        "id", "tool", "severity", "path", "line", "evidence", "hypothesis_id",
+        "source", "simulated"
+      ]
     },
     "verification_evidence": {
       "required_fields": ["run_id", "generated_at", "items"],
       "item_required_fields": ["finding_id", "status", "command", "exit_code", "output_excerpt", "artifact_path"],
       "item_optional_fields": {
-        "source": "string"
+        "source": "string",
+        "simulated": "boolean"
       }
     },
     "verified_findings": {
       "required_fields": ["run_id", "generated_at", "items"],
       "item_required_fields": ["finding_id", "status", "reason"],
       "item_optional_fields": {
-        "source": "string"
+        "source": "string",
+        "simulated": "boolean"
       }
     },
     "rca_and_variants": {
@@ -41,7 +43,8 @@
       "required_fields": ["run_id", "generated_at", "items"],
       "item_required_fields": ["finding_id", "status", "title", "affected_path", "line", "evidence_ref", "remediation", "regression_test"],
       "item_optional_fields": {
-        "source": "string"
+        "source": "string",
+        "simulated": "boolean"
       }
     }
   },
@@ -54,10 +57,10 @@
       "phase_refs",
       "phase_status",
       "status",
-      "summary"
+      "summary",
+      "simulated"
     ],
     "optional_fields": {
-      "simulated": "boolean",
       "artifact_metrics": "object"
     }
   },

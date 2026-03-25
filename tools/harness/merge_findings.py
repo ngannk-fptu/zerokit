@@ -315,12 +315,14 @@ def sort_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
-def assign_ids(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def assign_ids(findings: list[dict[str, Any]], *, simulated: bool = False) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for index, finding in enumerate(findings, start=1):
         items.append(
             {
                 "id": f"sf-{index:03d}",
+                "source": "merge-findings",
+                "simulated": simulated,
                 "tool": finding["tool"],
                 "severity": finding["severity"],
                 "path": finding["path"],
@@ -382,6 +384,17 @@ def validate_static_findings_payload(payload: dict[str, Any], contract: dict[str
             fail(f"static_findings item {index} has invalid evidence")
         if not isinstance(hypothesis_id, str) or not hypothesis_id.strip():
             fail(f"static_findings item {index} has invalid hypothesis_id")
+
+        # D3 shim transparency — source must be a non-empty string, simulated must be bool
+        source_val = item.get("source")
+        simulated_val = item.get("simulated")
+        if not isinstance(source_val, str) or not source_val.strip():
+            fail(f"static_findings item {index} has invalid source: {source_val!r}")
+        if not isinstance(simulated_val, bool):
+            fail(f"static_findings item {index} field 'simulated' must be boolean, got: {type(simulated_val).__name__}")
+        # Invariant: orchestration-shim ⟹ simulated=True
+        if source_val == "orchestration-shim" and simulated_val is not True:
+            fail(f"static_findings item {index} has source='orchestration-shim' but simulated={simulated_val!r}")
 
 
 def write_output(payload: dict[str, Any], output_path: Path) -> None:

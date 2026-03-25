@@ -5,6 +5,7 @@
     {
       "id": "as-001",
       "source": "orchestration-shim",
+      "simulated": true,
       "kind": "http_endpoint",
       "path": "src/api/users.ts",
       "line": 42,

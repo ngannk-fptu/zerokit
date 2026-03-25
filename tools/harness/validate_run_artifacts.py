@@ -23,6 +23,8 @@ ARTIFACT_LOCATIONS = {
 }
 RUN_STATE_LOCATION = "run_state.json"
 
+SHIM_SOURCE_VALUE = "orchestration-shim"
+
 
 def fail(message: str) -> None:
     print(f"[validate-run-artifacts] {message}", file=sys.stderr)
@@ -43,6 +45,33 @@ def ensure_required_fields(data: dict, required: List[str], label: str) -> None:
     missing = [field for field in required if field not in data]
     if missing:
         fail(f"{label} missing required fields: {missing}")
+
+
+def validate_simulated_field(value: object, label: str) -> bool:
+    """Validate that 'simulated' is present and boolean. Returns the bool value."""
+    if not isinstance(value, bool):
+        fail(f"{label} field 'simulated' must be boolean, got: {type(value).__name__}")
+    return value  # type: ignore[return-value]
+
+
+def validate_shim_transparency(item: dict, idx: int, artifact_name: str) -> None:
+    """Enforce shim transparency invariant: source='orchestration-shim' ⟹ simulated=True."""
+    source = item.get("source")
+    simulated = item.get("simulated")
+
+    # 'simulated' must be boolean if present
+    if simulated is not None and not isinstance(simulated, bool):
+        fail(
+            f"{artifact_name}.items[{idx}] field 'simulated' must be boolean, "
+            f"got: {type(simulated).__name__}"
+        )
+
+    # Core invariant: shim source must be marked simulated
+    if source == SHIM_SOURCE_VALUE and simulated is not True:
+        fail(
+            f"{artifact_name}.items[{idx}] has source='{SHIM_SOURCE_VALUE}' "
+            f"but simulated={simulated!r} — shim-generated artifacts must set simulated=true"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -72,6 +101,7 @@ def main() -> None:
 
     contract = read_json(contract_path)
     artifacts_contract = contract.get("artifacts", {})
+    run_state_contract = contract.get("run_state", {})
     enums = contract.get("enums", {})
 
     verification_status = set(enums.get("verification_status", []))
@@ -80,22 +110,27 @@ def main() -> None:
     if not verification_status or not finding_status or not priorities:
         fail("contract enums are incomplete")
 
+    # --- Validate run_state.json ---
     run_state_path = run_root / RUN_STATE_LOCATION
     run_state_present = run_state_path.exists()
     run_state: Dict[str, object] = {}
     run_state_run_id: str | None = None
     simulated_run = False
     run_mode = "REAL RUN"
+
     if run_state_present:
         loaded_run_state = read_json(run_state_path)
         if not isinstance(loaded_run_state, dict):
             fail("run_state.json must contain an object")
         run_state = loaded_run_state
 
+        # Enforce run_state required fields (including 'simulated' — required since v1.1.0)
+        rs_required = run_state_contract.get("required_fields", [])
+        ensure_required_fields(run_state, rs_required, "run_state.json")
+
+        # 'simulated' is required and must be boolean
         simulated_value = run_state.get("simulated")
-        if simulated_value is not None and not isinstance(simulated_value, bool):
-            fail("run_state.json field 'simulated' must be boolean when present")
-        simulated_run = simulated_value is True
+        simulated_run = validate_simulated_field(simulated_value, "run_state.json")
         run_mode = "SIMULATED RUN" if simulated_run else "REAL RUN"
 
         run_state_value = run_state.get("run_id")
@@ -104,6 +139,7 @@ def main() -> None:
                 fail("run_state.json has invalid run_id")
             run_state_run_id = run_state_value
 
+    # --- Validate artifact files ---
     loaded: Dict[str, dict] = {}
     run_ids = set()
 
@@ -126,8 +162,10 @@ def main() -> None:
         for idx, item in enumerate(items):
             if not isinstance(item, dict):
                 fail(f"{artifact_name}.items[{idx}] must be object")
+
             ensure_required_fields(item, required_item_fields, f"{artifact_name}.items[{idx}]")
 
+            # Enum validation
             status = item.get("status")
             if status is not None and status not in (verification_status | finding_status):
                 fail(f"{artifact_name}.items[{idx}] has invalid status: {status}")
@@ -135,6 +173,13 @@ def main() -> None:
             priority = item.get("priority")
             if priority is not None and priority not in priorities:
                 fail(f"{artifact_name}.items[{idx}] has invalid priority: {priority}")
+
+            # Shim transparency invariant: orchestration-shim source ⟹ simulated=true
+            validate_shim_transparency(item, idx, artifact_name)
+
+            # For static_findings: 'simulated' is required and must be boolean
+            if artifact_name == "static_findings":
+                validate_simulated_field(item.get("simulated"), f"static_findings.items[{idx}]")
 
         run_id = data.get("run_id")
         if not isinstance(run_id, str) or not run_id.strip():
@@ -151,6 +196,7 @@ def main() -> None:
             f"run_state={run_state_run_id} artifacts={artifact_run_id}"
         )
 
+    # --- Proof gate: confirmed report items must have confirmed evidence ---
     evidence_by_finding = {
         item["finding_id"]: item for item in loaded["verification_evidence"].get("items", [])
     }
