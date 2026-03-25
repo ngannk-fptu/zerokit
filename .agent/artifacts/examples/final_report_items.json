@@ -5,6 +5,7 @@
     {
       "finding_id": "sf-001",
       "source": "orchestration-shim",
+      "simulated": true,
       "status": "confirmed",
       "title": "Stored XSS in profile rendering",
       "affected_path": "src/api/users.ts",

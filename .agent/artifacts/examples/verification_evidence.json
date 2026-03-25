@@ -5,6 +5,7 @@
     {
       "finding_id": "sf-001",
       "source": "orchestration-shim",
+      "simulated": true,
       "status": "confirmed",
       "command": "pytest tests/security/test_profile_xss.py::test_stored_xss",
       "exit_code": 1,

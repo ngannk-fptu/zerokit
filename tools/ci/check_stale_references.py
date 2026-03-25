@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fail CI when stale legacy references reappear in docs and skills."""
+"""Fail CI when stale legacy references reappear anywhere in the repo.
+
+Scope: entire repo tree (minus exclusions below).
+Previous scope was limited to .agent/, docs/, root *.md — expanded in D1.
+"""
 
 from __future__ import annotations
 
@@ -8,21 +12,62 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-AGENT_DIR = REPO_ROOT / ".agent"
-DOCS_DIR = REPO_ROOT / "docs"
 
-ALLOWLIST_BY_NAME = {
-    "ci_guardrails_runbook.md": "Runbook intentionally documents forbidden legacy patterns.",
-    "check_stale_references.py": "This checker embeds forbidden token definitions.",
+# Directory names excluded from scanning (matched against any path component)
+EXCLUDED_DIRS = {
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".codex-review",
+    "zerokit.egg-info",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
 }
 
+# Path prefixes excluded from scanning (relative to REPO_ROOT).
+# These are runtime/cache directories that live inside the repo but are not source.
+EXCLUDED_PATH_PREFIXES = [
+    ".venv",                # Python virtual environment
+    ".devcontainer/state",  # XDG cache for opencode profiles (uv, bun package caches)
+    ".sisyphus",            # Agent planning/handoff state (runtime, not source)
+    ".opencode/node_modules",  # OpenCode npm dependencies (third-party)
+    ".claude",              # Claude session state
+    ".context",             # Context window tracking
+    ".agent/artifacts/runs",  # Generated pentest run output (runtime, not source)
+]
+
+# Files allowlisted by name — these legitimately reference forbidden tokens
+# in a "do not do this" or "this is what we moved away from" context.
+ALLOWLIST_BY_NAME: dict[str, str] = {
+    # Runbook intentionally documents forbidden legacy patterns as examples.
+    "ci_guardrails_runbook.md": "Runbook intentionally documents forbidden legacy patterns.",
+    # This checker embeds token definitions — must be self-exempt.
+    "check_stale_references.py": "This checker embeds forbidden token definitions.",
+    # Scope boundary checker uses forbidden path strings as disallowed-path checks.
+    "check_scope_boundaries.py": "Uses forbidden path strings as scope-check targets, not references.",
+    # Research doc comparing V3 with ZeroKit2 v5.2 — mentions ZeroKit2 by name for comparison.
+    "teammate-release-zerokit2-v52-comparative-analysis.md": (
+        "Research comparison doc — ZeroKit2 mentioned as the external release being analyzed."
+    ),
+    # Gap analysis doc that documents old platform references to show what changed.
+    "vision-alignment-gap-analysis.md": (
+        "Documents legacy platform mentions (Antigravity, etc.) to show what was corrected."
+    ),
+    # Plan doc lists forbidden tokens as examples of what to purge.
+    "plan.md": "Implementation plan lists forbidden tokens in the 'do not do' inventory section.",
+}
+
+# Case-insensitive brand/product tokens — match anywhere in a line
 CASE_INSENSITIVE_TOKENS = [
     "ZeroKit2",
     "hunt_pipeline",
     "hunt-pipeline",
+    "Antigravity",
     "SecOpsAgentKit",
 ]
 
+# Case-sensitive path fragments — match as substrings
 CASE_SENSITIVE_PATH_FRAGMENTS = [
     "core/agents/",
     "core/tools/",
@@ -32,6 +77,8 @@ CASE_SENSITIVE_PATH_FRAGMENTS = [
     "bpost",
 ]
 
+# Gemini context: only flag "gemini" when it appears as an LLM provider reference,
+# not when it's a constellation, a person's name, or a general product mention.
 GEMINI_PROVIDER_KEYWORDS = [
     "provider",
     "llm",
@@ -45,33 +92,70 @@ GEMINI_PROVIDER_KEYWORDS = [
     "google",
 ]
 
-CI_PATTERNS = [(token, re.compile(re.escape(token), re.IGNORECASE)) for token in CASE_INSENSITIVE_TOKENS]
+CI_PATTERNS = [
+    (token, re.compile(re.escape(token), re.IGNORECASE))
+    for token in CASE_INSENSITIVE_TOKENS
+]
 GEMINI_PATTERN = re.compile(r"\bgemini\b", re.IGNORECASE)
+
+# File extensions to scan (binary files are skipped by extension)
+TEXT_EXTENSIONS = {
+    ".py", ".md", ".txt", ".json", ".jsonc", ".yaml", ".yml",
+    ".sh", ".bash", ".zsh", ".toml", ".cfg", ".ini", ".env",
+    ".ts", ".js", ".mjs", ".cjs", ".tsx", ".jsx",
+    ".html", ".css", ".scss",
+    "",  # extensionless files (Makefile, Dockerfile, etc.)
+}
+
+
+def is_excluded(path: Path) -> bool:
+    """Return True if path falls under an excluded directory or path prefix."""
+    # Check excluded directory names (any path component)
+    for part in path.parts:
+        if part in EXCLUDED_DIRS:
+            return True
+    # Check excluded path prefixes (relative to REPO_ROOT)
+    try:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return False
+    for prefix in EXCLUDED_PATH_PREFIXES:
+        if relative == prefix or relative.startswith(prefix + "/"):
+            return True
+    return False
+
+
+def is_text_file(path: Path) -> bool:
+    """Return True if the file has a scannable extension."""
+    return path.suffix.lower() in TEXT_EXTENSIONS
 
 
 def gather_scan_paths() -> list[Path]:
-    paths = []
-    if AGENT_DIR.exists():
-        paths.extend(sorted(path for path in AGENT_DIR.rglob("*") if path.is_file()))
-    if DOCS_DIR.exists():
-        paths.extend(sorted(path for path in DOCS_DIR.rglob("*.md") if path.is_file()))
-    paths.extend(sorted(REPO_ROOT.glob("*.md")))
-
-    unique: list[Path] = []
+    """Walk the entire repo and return all scannable files."""
+    paths: list[Path] = []
     seen: set[Path] = set()
-    for path in paths:
+
+    for path in sorted(REPO_ROOT.rglob("*")):
+        if not path.is_file():
+            continue
+        if is_excluded(path):
+            continue
+        if not is_text_file(path):
+            continue
         resolved = path.resolve()
         if resolved in seen:
             continue
         seen.add(resolved)
-        unique.append(path)
-    return unique
+        paths.append(path)
+
+    return paths
 
 
 def gemini_is_provider_context(line: str) -> bool:
-    lowered = line.lower()
+    """True when 'gemini' is used in an LLM-provider context."""
     if not GEMINI_PATTERN.search(line):
         return False
+    lowered = line.lower()
     return any(keyword in lowered for keyword in GEMINI_PROVIDER_KEYWORDS)
 
 
@@ -89,6 +173,7 @@ def scan_line(line: str) -> list[str]:
     if gemini_is_provider_context(line):
         hits.append("Gemini(provider-context)")
 
+    # Deduplicate preserving order
     deduped: list[str] = []
     for hit in hits:
         if hit not in deduped:
@@ -103,7 +188,11 @@ def main() -> None:
         if path.name in ALLOWLIST_BY_NAME:
             continue
 
-        text = path.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+
         relative = path.relative_to(REPO_ROOT).as_posix()
 
         for line_number, line in enumerate(text.splitlines(), start=1):

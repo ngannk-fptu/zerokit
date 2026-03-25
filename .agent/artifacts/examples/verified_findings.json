@@ -5,6 +5,7 @@
     {
       "finding_id": "sf-001",
       "source": "orchestration-shim",
+      "simulated": true,
       "status": "confirmed",
       "reason": "PoC reproduces stored XSS with executable payload"
     }
