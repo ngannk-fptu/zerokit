@@ -34,12 +34,15 @@ class Orchestrator:
         self.context: PipelineContext = None
         self.state_manager = StateManager() # NEW: Shared state manager
         
+        self.llm_gateway = LLMGateway() # Central Intelligence
+        from .tools.sandbox_executor import SandboxExecutor
+        self.sandbox = SandboxExecutor()
+        
         # Initialize Specialized Agents
         self.detector = Detector()
-        self.verifier = Verifier()
+        self.verifier = Verifier(self.sandbox, self.llm_gateway)
         self.reporter = Reporter() # Added Reporter to instance
         self.patcher = Patcher() # NEW: Patcher
-        self.llm_gateway = LLMGateway() # Central Intelligence
         from .agents.profiler import RepoProfiler
         self.profiler = RepoProfiler()
         self.harness_agent = HarnessAgent(llm_gateway=self.llm_gateway)
@@ -426,6 +429,11 @@ class Orchestrator:
             # We use RepoProfiler to gather surface area + semantic graph.
             self.context.surface = await self.profiler.analyze(self.context)
             
+            # Guard: Profiler may return None for unsupported projects
+            if not self.context.surface:
+                logger.warning("Profiler returned no surface. Creating empty AttackSurface fallback.")
+                self.context.surface = AttackSurface(entry_points=[])
+            
             # Record evidence for the observer
             p.findings = self.context.surface.entry_points
             
@@ -434,68 +442,65 @@ class Orchestrator:
                 self.observer.note(f"Semantic Graph: {len(self.context.code_graph.get('nodes', []))} nodes, {len(self.context.code_graph.get('edges', []))} edges")
 
             logger.info(f"Surface map complete: Found {len(self.context.surface.entry_points)} entry points.")
+
+    async def run_stage_hypothesis(self):
         """Phase 3: Language detection → SecurityProfile → ThreatModeler hypotheses."""
         with self.observer.phase(3, "Deep Logic") as p:
             self.report_progress("Phase 3", "Deep Logic", "Auto-detecting language + generating hypotheses...")
             logger.info("Stage: Deep Logic (Language Detection + ThreatModeler)")
-    
-            # 1. Auto-detect language and build SecurityProfile
+
+            # 1. Auto-detect language and build SecurityProfile (if profiler didn't already set it)
             if not self.context.security_profile:
                 self.context.security_profile = get_profile_for_repo(self.context.repo_path)
                 lang = self.context.security_profile.language
                 fw   = self.context.security_profile.framework or "generic"
                 logger.info(f"SecurityProfile built: {lang}/{fw}")
-    
+
             # 2. Generate hypotheses via ThreatModeler (real LLM call)
-        if not self.context.hypotheses:
-            # PRUNE Attack Surface based on Semgrep findings to save LLM tokens!
-            semgrep_files = set()
-            for f in self.context.static_findings:
-                if f.tool_name == "semgrep":
-                    # Location format is usually path:line
-                    path = f.location.split(":")[0] if isinstance(f.location, str) else ""
-                    if path:
-                        semgrep_files.add(path)
-            
-            if self.context.surface and semgrep_files:
-                original_len = len(self.context.surface.entry_points)
+            if not self.context.hypotheses:
+                # PRUNE Attack Surface based on Semgrep findings to save LLM tokens!
+                semgrep_files = set()
+                for f in self.context.static_findings:
+                    if f.tool_name == "semgrep":
+                        path = f.location.split(":")[0] if isinstance(f.location, str) else ""
+                        if path:
+                            semgrep_files.add(path)
                 
-                # Keep entry points that are NOT in already-infected files
-                filtered_eps = []
-                for ep in self.context.surface.entry_points:
-                    ep_path = ep.code_location.split(":")[0] if ep.code_location else ""
-                    if ep_path not in semgrep_files:
-                        filtered_eps.append(ep)
-                        
-                self.context.surface.entry_points = filtered_eps
-                logger.info(
-                    f"Token Saver: Removed {original_len - len(filtered_eps)} entry points "
-                    f"that were already caught by Semgrep."
-                )
+                if self.context.surface and semgrep_files:
+                    original_len = len(self.context.surface.entry_points)
+                    filtered_eps = [
+                        ep for ep in self.context.surface.entry_points
+                        if (ep.code_location.split(":")[0] if ep.code_location else "") not in semgrep_files
+                    ]
+                    self.context.surface.entry_points = filtered_eps
+                    logger.info(
+                        f"Token Saver: Removed {original_len - len(filtered_eps)} entry points "
+                        f"that were already caught by Semgrep."
+                    )
 
-            try:
-                from .agents.threat_modeler import ThreatModeler
-                modeler = ThreatModeler()
+                try:
+                    from .agents.threat_modeler import ThreatModeler
+                    modeler = ThreatModeler()
 
-                surface = self.context.surface or AttackSurface(entry_points=[])
-                self.context.hypotheses = await modeler.generate_hypotheses(
-                    surface, 
-                    security_profile=self.context.security_profile,
-                    code_graph=self.context.code_graph,
-                    repo_path=self.context.repo_path
-                )
-                logger.info(f"ThreatModeler generated {len(self.context.hypotheses)} hypotheses.")
-            except Exception as e:
-                logger.warning(f"ThreatModeler failed (LLM unavailable?): {e}")
-                logger.info("Falling back to profile-driven generic hypotheses.")
-                self.context.hypotheses = self._build_generic_hypotheses()
+                    surface = self.context.surface or AttackSurface(entry_points=[])
+                    self.context.hypotheses = await modeler.generate_hypotheses(
+                        surface, 
+                        security_profile=self.context.security_profile,
+                        code_graph=self.context.code_graph,
+                        repo_path=self.context.repo_path
+                    )
+                    logger.info(f"ThreatModeler generated {len(self.context.hypotheses)} hypotheses.")
+                except Exception as e:
+                    logger.warning(f"ThreatModeler failed (LLM unavailable?): {e}")
+                    logger.info("Falling back to profile-driven generic hypotheses.")
+                    self.context.hypotheses = self._build_generic_hypotheses()
 
-        # 3. CWE mapping for any hypothesis without it
-        for h in self.context.hypotheses:
-            if not h.metadata.get("cwe"):
-                logger.debug(f"  CWE pending for: {h.description[:50]}")
+            # 3. CWE mapping for any hypothesis without it
+            for h in self.context.hypotheses:
+                if not h.metadata.get("cwe"):
+                    logger.debug(f"  CWE pending for: {h.description[:50]}")
 
-        logger.info(f"Phase 3 complete. {len(self.context.hypotheses)} hypotheses ready.")
+            logger.info(f"Phase 3 complete. {len(self.context.hypotheses)} hypotheses ready.")
 
     def _build_generic_hypotheses(self) -> List[Hypothesis]:
         """Fallback: build basic hypotheses from SecurityProfile sinks."""
@@ -513,6 +518,34 @@ class Orchestrator:
             hypotheses.append(h)
         logger.info(f"Generated {len(hypotheses)} fallback hypotheses from SecurityProfile.")
         return hypotheses
+
+    def run_stage_detection(self):
+        """Phase 4 & 5: Static Detection — Hypothesis-driven Semgrep + Joern scanning."""
+        with self.observer.phase(4, "Static Detection") as p:
+            self.report_progress("Phase 4 & 5", "Static Detection", "Running hypothesis-driven Semgrep/Joern...")
+            logger.info("Stage: Static Detection (Hypothesis-Driven)")
+
+            if not self.context.hypotheses:
+                logger.info("No hypotheses to drive detection. Skipping.")
+                return
+
+            try:
+                new_findings: List[StaticFinding] = self.detector.detect(
+                    self.context.hypotheses,
+                    self.context.security_profile,
+                    self.context.repo_path
+                )
+                if new_findings:
+                    self.context.static_findings.extend(new_findings)
+                logger.info(
+                    f"Static Detection complete. {len(new_findings)} new findings. "
+                    f"Total: {len(self.context.static_findings)}."
+                )
+                p.findings = new_findings
+            except Exception as e:
+                logger.error(f"Static Detection failed: {e}")
+                if self.observer:
+                    self.observer.note(f"Detection failed: {e}")
 
     async def run_stage_verification(self, findings_to_verify: List[StaticFinding] = None):
         """Phase 6 & 7: Dynamic Verification"""

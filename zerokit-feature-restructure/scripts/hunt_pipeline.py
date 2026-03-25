@@ -4,8 +4,8 @@ import argparse
 
 # Add .agent to path to allow imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
-agent_dir = os.path.join(current_dir, '.agent')
-sys.path.append(agent_dir)
+project_root = os.path.dirname(current_dir)
+sys.path.insert(0, project_root)
 
 try:
     from core.orchestrator import Orchestrator
@@ -28,8 +28,9 @@ def main():
         
     print(f"🚀 Starting Hunt Pipeline for: {target_path}")
     
+    import asyncio
     orch = Orchestrator()
-    report = orch.run_full_pipeline(target_path)
+    report = asyncio.run(orch.run_full_pipeline(target_path))
     
     print("\n✅ Pipeline Complete!")
     print("\n--- REPORT SUMMARY ---\n")
