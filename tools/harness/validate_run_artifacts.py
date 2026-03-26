@@ -12,6 +12,9 @@ from typing import Dict, List
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONTRACT = REPO_ROOT / ".agent/artifacts/contracts/artifact_contract.json"
 
+# TODO: Derive phase directory prefixes from _phase_config.load_phase_config()
+# instead of hardcoding them here.  Left as-is to avoid breaking existing tests
+# that depend on the exact ARTIFACT_LOCATIONS mapping.
 ARTIFACT_LOCATIONS = {
     "attack_surface": "02-surface/attack_surface.json",
     "hypotheses": "03-static/hypotheses.json",

@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  vuln-flask:
+    build: .
+    ports:
+      - "5000:5000"
+    networks:
+      - pentest-net
+
+networks:
+  pentest-net:
+    name: pentest-net
+    driver: bridge
