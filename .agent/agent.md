@@ -19,9 +19,23 @@ Gather scope before touching code.
 1. Confirm the target repository path.
 2. Identify priority languages: .NET/C#, TypeScript/JS, Java, Go, Python.
 3. Collect constraints: allowed tools, time budget, prohibited actions.
-4. Create run directory:
+4. Initialize the run directory using the harness tool:
+   ```bash
+   python tools/harness/init_artifact_run.py \
+     --target <repo-path> \
+     --run-id <run-id>
    ```
-   mkdir -p artifacts/runs/<run-id>/{01-intake,02-surface,03-static,04-verify,05-rca,06-report}
+   This creates all 6 phase subdirectories, writes a valid
+   `run_state.json` with all required contract fields, and
+   validates that the run-id is unique. Use `--dry-run` for
+   simulated runs.
+
+   For custom output locations:
+   ```bash
+   python tools/harness/init_artifact_run.py \
+     --target <repo-path> \
+     --run-id <run-id> \
+     --output-dir /path/to/custom/output
    ```
 5. Write `01-intake/plan.json`:
    ```json
@@ -173,15 +187,19 @@ For each static finding, attempt to confirm exploitability:
    If the flow is clearly broken (sanitized, unreachable), mark
    `rejected` and move on.
 
-2. **Build a PoC** when the flow looks exploitable:
+2. **Build a PoC** when the flow looks exploitable. Use the harness
+   connector:
    ```bash
-   # Run PoC in isolated Docker container
-   docker run --rm --network none \
-     -v <target-path>:/app:ro \
-     -v <poc-script>:/poc.py:ro \
-     python:3.12-slim \
-     python /poc.py
+   python tools/harness/run_poc.py \
+     --finding-id sf-001 \
+     --poc-script <path-to-poc.py> \
+     --target <target-path> \
+     --run-id <run-id> \
+     --output artifacts/runs/<run-id>/04-verify/sf-001.log
    ```
+   The connector runs the PoC in an isolated Docker container with
+   `--network none` (default) or `--network pentest-net` for HTTP
+   targets. It captures stdout, stderr, and exit code automatically.
 
 3. **Capture evidence** for every attempt:
    - Command run
@@ -227,9 +245,24 @@ Status rules:
 - `rejected` -- evidence disproves exploitability (sanitized, unreachable)
 - `inconclusive` -- retry with different approach before giving up
 
-For `inconclusive`, iterate: try alternative payloads, different entry
-points, or manual code analysis. After 2 retries, mark `rejected` with
-explanation.
+For `inconclusive`, iterate using the **3-strategy rotation**:
+
+1. **Standard** (first attempt) — direct payload matching the CWE:
+   SQLi → `' UNION SELECT ...`, XSS → `<script>alert(1)</script>`,
+   path traversal → `../../etc/passwd`
+2. **Time-based** (if standard is inconclusive) — blind detection via
+   delay injection: `' OR SLEEP(5)--` for SQLi, slow regex for ReDoS.
+   Compare response time against baseline.
+3. **Error-based** (if time-based is inconclusive) — craft a payload that
+   triggers a distinctive error message revealing internals: type errors,
+   stack traces, SQL syntax errors.
+
+Check `.agent/knowledge_base/templates/poc/` for CWE-mapped PoC
+templates. Adapt the relevant template to the target before writing
+from scratch.
+
+After all 3 strategies, if still inconclusive → mark `rejected` with
+explanation of what was tried.
 
 ### Phase 05 -- Root Cause Analysis
 

@@ -259,13 +259,69 @@ Part 2 (Vertical Slice):
   D12 (E2E integration + CI wiring) -- needs D8-D11 + D5
 ```
 
+## Learnings from v5.2 (teammate release)
+
+Comparative analysis (`docs/research/teammate-release-zerokit2-v52-comparative-analysis.md`)
+identified specific artifacts worth importing. We are NOT merging architectures — V3's
+agent-centric model and v5.2's pipeline model are load-bearing opposites. But v5.2 has
+concrete, importable knowledge-base assets that fill real gaps.
+
+### Imported: PoC template library (8 new templates)
+
+**Justification:** V3's Phase 04 requires the agent to write PoC scripts from scratch.
+v5.2 ships 8 CWE-mapped templates we were missing (`auth_bypass_check`, `deserialization`,
+`hardcoded_creds`, `info_disclosure`, `missing_auth`, `nosql_injection`, `open_redirect`,
+`path_traversal`, `resource_exhaustion`). These are standalone Python scripts with
+`{{TARGET}}`/`{{PAYLOAD}}` placeholders — no LLM coupling, no pipeline dependency.
+They slot directly into `.agent/knowledge_base/templates/poc/` as agent reference material.
+The agent reads these, adapts them to the target, and runs via `run_poc.py`.
+
+### Imported: 3-strategy verification rotation (Phase 04 guidance)
+
+**Justification:** V3's Phase 04 retries inconclusive findings but gives no structured
+guidance on *what* to try next. v5.2's verifier rotates through 3 strategies:
+1. **Standard** — direct payload (SQLi string, XSS tag, etc.)
+2. **Time-based** — blind detection via delay injection (e.g. `SLEEP(5)`)
+3. **Error-based** — trigger distinctive error messages revealing internals
+
+This is a methodology improvement, not code. Added to `agent.md` Phase 04 as agent
+guidance — the agent decides which strategy to apply, consistent with the V3 model.
+
+### Planned: SARIF output format (D11)
+
+**Justification:** v5.2 generates SARIF for GitHub Code Scanning integration. V3's
+Phase 06 report generator (D11) should support SARIF as an optional output format
+alongside the primary JSON report. Useful for CI/CD integration — GitHub, GitLab,
+and Azure DevOps all consume SARIF natively. Added to D11 scope.
+
+### Planned: Joern query library reference (D10)
+
+**Justification:** v5.2's `core/tools/joern_queries.py` (400 LOC) has pre-defined CPG
+patterns for C, Java, JS, Python, Go. V3's `run_joern.py` currently accepts arbitrary
+Joern queries but ships no query library. Extracting v5.2's patterns as a reference
+document in `.agent/knowledge_base/references/` gives the agent concrete taint queries
+to use in Phase 05 instead of generating them from scratch.
+
+### Deferred: Multi-repo variant analysis
+
+**Justification:** v5.2's Phase 8 MRVA hunts patterns across multiple repos. V3's Phase 05
+does single-repo variant search via Joern. MRVA is valuable but requires cross-repo
+tooling infrastructure that is not in V3's current scope. Tracked for future consideration.
+
+### NOT importing: autonomous orchestration, LLM-coupled tools, in-memory artifacts
+
+These are v5.2's core architecture decisions and are incompatible with V3's agent-centric
+model. Importing them would require choosing v5.2's philosophy and abandoning V3's. See
+section 13 of the comparative analysis for detailed reasoning.
+
 ## Out of Scope
 - Multi-language support (Java, Go, TS -- deferred)
-- Scanner ingest / SARIF adapter (deferred)
+- Scanner ingest / SARIF adapter (deferred — partial D11 SARIF planned)
 - Async/concurrent execution model (deferred)
 - Language profiling hardening (deferred)
 - Production codebase testing (deferred)
 - `init_artifact_run.py` external-agent invocation testing (standalone use deferred)
+- Multi-repo variant analysis (v5.2 learning, deferred)
 
 ## Implementation Notes (from eng review)
 

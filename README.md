@@ -61,10 +61,70 @@ the agent needs to run a whitebox pentest.
 .NET, TypeScript/JavaScript, Java, Go, Python
 
 ## Setup
+
+### Option A: DevContainer (recommended)
+
+Open in VS Code and select "Reopen in Container." The devcontainer
+installs all dependencies automatically: Python 3.11, uv, Semgrep,
+Gitleaks, Bun, OpenCode.
+
+After the container builds:
+
 ```bash
-pip install -e ".[dev]"
-make test
+# Profile A: develop ZeroKit
+opencode-a
+
+# Profile B: run ZeroKit as a pentester against a target
+opencode-b
 ```
+
+### Option B: Local install
+
+```bash
+# 1. Python dependencies
+pip install -e ".[dev,tools]"
+
+# 2. External tools (required for real runs)
+pip install semgrep                               # SAST scanner
+# Gitleaks: https://github.com/gitleaks/gitleaks
+# Joern:    https://joern.io (optional, Phase 05)
+# Docker:   required for PoC verification (Phase 04)
+
+# 3. Verify
+make check   # CI guardrails (5 checks)
+make test    # unit tests
+```
+
+## Quick Start: Run a Pentest
+
+```bash
+# 1. Launch Profile B (or point any agent at .agent/agent.md)
+opencode-b
+
+# 2. Tell the agent what to pentest
+> Run a whitebox pentest on tests/fixtures/vuln-flask-app
+
+# The agent will:
+#   - Initialize a run directory (init_artifact_run.py)
+#   - Profile the target (detect_repo_profile.py)
+#   - Run static analysis (run_semgrep.py + run_gitleaks.py)
+#   - Merge and deduplicate findings (merge_findings.py)
+#   - Verify with PoCs in Docker (run_poc.py)
+#   - Analyze root causes with Joern (run_joern.py)
+#   - Validate all artifacts (validate_run_artifacts.py)
+```
+
+### Test fixture
+
+A vulnerable Flask app is included for testing:
+
+```bash
+cd tests/fixtures/vuln-flask-app
+docker-compose up --build    # starts on localhost:5000
+```
+
+Contains: CWE-89 SQL injection, CWE-22 path traversal, and a safe
+parameterized query (false positive test).
 
 ## Hard Rules
 - No proof, no vulnerability.
