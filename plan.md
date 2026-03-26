@@ -425,14 +425,20 @@ section 13 of the comparative analysis for detailed reasoning.
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 2 | issues_found | Run 1: 3 findings (all fixed). Run 2: 4 findings (all fixed) |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open (PLAN) | 8 issues, 3 critical gaps |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
 
-**OUTSIDE VOICE (Codex gpt-5.4 xhigh):** 13 findings — Docker network literal name bug, D10 scope understatement (new Joern integration required), Phase 02→03 `attack_surface.json` wiring gap, `tool-versions.json` not consumed anywhere, 5-min criterion unengineered for cold CI.
+**CODEX (Run 1):** 3 findings in validate_run_artifacts (P1), init_artifact_run (P2), check_stale_references (P3) — all fixed and committed.
 
-**CROSS-MODEL:** Codex and eng review agree on Docker network issue (5A) and D10 scope. Codex overrides eng review decision 3B — `init_artifact_run.py` standalone use is deferred; Codex argues no justified consumer exists yet. Kept as standalone per user decision but flagged.
+**CODEX (Run 2):** 4 findings in core harness tools — all fixed and committed (d9f22d5):
+- [P1] Joern TAINT_QUERY: unbalanced `)` made regex invalid on every Phase 05 run
+- [P1] run_poc.py: Docker infra failures (exit 125/126/127) mapped to `rejected` — now `inconclusive`
+- [P2] run_gitleaks.py: absolute host paths in `File` field — now relativized to target
+- [P2] detect_repo_profile.py: root-only manifest checks missed nested monorepo manifests — now uses rglob
+
+**CROSS-MODEL:** Codex and eng review agree on Docker network issue (D7/D9) and D10 Joern scope. Codex Run 2 found a pre-existing TAINT_QUERY bug not caught by eng review or tests — caught only by adversarial live inspection.
 
 **UNRESOLVED:** 0 unresolved decisions.
 
-**VERDICT:** ENG REVIEW issues addressed in Implementation Notes. All cross-model tensions surfaced. Eng review required before ship.
+**VERDICT:** ENG REVIEW issues addressed in Implementation Notes. Both Codex runs fully resolved. Eng review required before ship.
