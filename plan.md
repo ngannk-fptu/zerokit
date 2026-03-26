@@ -172,16 +172,17 @@ Two-part plan: (1) Fix all P0 foundation issues from the Claude x Codex consensu
    - Set status: `confirmed` (extracted data or file content), `rejected` (no proof), `inconclusive` (error/timeout)
    - Write `04-verify/verification_evidence.json` and `04-verify/verified_findings.json`
 
-### D10: Phase 05 — RCA + Variant Search
-**Problem:** Confirmed findings need root cause analysis.
-
-**Actions:**
-1. Create `tools/harness/run_phase05.py`:
-   - For each confirmed finding:
-     - Run Joern CPG query via `run_joern.py` to trace taint flow (source -> sink)
-     - Generate RCA from taint trace: what input, through what path, to what sink
-     - Search for variants: same pattern in other files
-   - Write `05-rca/rca_and_variants.json`
+### D10: Phase 05 is a new Joern integration (Codex finding — scope correction)
+- `run_joern.py` currently runs ONE broad taint query and returns generic intermediate findings
+- D10 requires per-finding Joern queries: for each confirmed finding from Phase 04, build a targeted CPG query
+  - Input: confirmed finding with `path`, `line`, `cwe`, `sink` from `verified_findings.json`
+  - Query: parameterized Joern CPG query scoped to that file/method, tracing source→sink
+  - Output: real taint trace (entry point → data flow path → sink), not just a generic match
+- Extend `run_joern.py` to accept `--query` parameter with a Joern Scala expression
+- `run_phase05.py` constructs per-finding queries; calls `run_joern.py` once per confirmed finding
+- Variant search: after taint trace confirmed, run a second query scanning for same sink pattern elsewhere in repo
+- RCA bundle per finding: taint trace text + variant count + patch guidance
+- Output: `05-rca/rca_and_variants.json` with per-finding RCA bundles
 
 ### D11: Phase 06 — Report Generator
 **Problem:** Need audit-quality report from confirmed findings.
@@ -264,20 +265,97 @@ Part 2 (Vertical Slice):
 - Async/concurrent execution model (deferred)
 - Language profiling hardening (deferred)
 - Production codebase testing (deferred)
+- `init_artifact_run.py` external-agent invocation testing (standalone use deferred)
+
+## Implementation Notes (from eng review)
+
+### D1: CI checker scope
+- `check_stale_references.py` must scan **entire repo** (not just `.agent/`, `docs/`, root `*.md`)
+- Exclusions: `.git/`, `node_modules/`, `__pycache__/`, `.codex-review/`, `.venv/`
+
+### D3: `simulated` is required, not optional
+- Move `simulated` from `optional_fields` to `required_fields` in `artifact_contract.json` run_state section
+- Every `run_state.json` must explicitly declare `"simulated": true` or `"simulated": false`
+- `validate_run_artifacts.py` reads it as required; existing test fixtures need the field added
+
+### D4: Required sequencing within the task
+1. Create `_phase_config.py` shared loader first
+2. Migrate `validate_run_artifacts.py` + `check_workflow_integrity.py` → loader (remove 7 hardcoded phase-dir strings)
+3. Only then create `run_master_workflow.py` + `init_artifact_run.py` (both use loader)
+- `init_artifact_run.py` stays as a standalone tool (can be invoked by agent independently)
+- Critical gap to handle: missing `phase_config.json` → raise `FileNotFoundError` with clear message, not silent import crash
+- Critical gap to handle: duplicate `run_id` → raise explicit error, do not silently overwrite
+
+### D4: Phase 02 artifact gap (Codex finding)
+- `artifact_contract.json` and `validate_run_artifacts.py` require `02-surface/attack_surface.json`
+- But Phase 02 is `detect_repo_profile.py`, which produces `repository_profile.json` — not `attack_surface.json`
+- Resolution: `run_phase03.py` (D8) is responsible for deriving `attack_surface.json` from the profile:
+  - Reads `repository_profile.json`, extracts `entrypoints` + `high_risk_sinks`, writes `02-surface/attack_surface.json`
+  - Phase 03 already has full context to do this (it reads the profile to select Semgrep rules)
+- Update `run_master_workflow.py` to pass `repository_profile.json` path to `run_phase03.py`
+- This is a one-time fix — do not change `detect_repo_profile.py` output schema
+
+### D5: Test scope boundary
+- `run_master_workflow.py` tests in D5 cover **dry-run mode only** (`--dry-run`, `"simulated": true`)
+- Real-mode dispatch tests live in D12 (E2E) — not D5
+- Add comment in test file: `# Real-mode dispatch tested in test_e2e_vertical_slice.py`
+
+### D6: Already ~80% done
+- `.github/workflows/harness-guardrails.yml` already has `pip install -e ".[dev]"`, `make lint`, `make test`
+- Remaining: (1) add separate integration job with Docker setup, (2) verify `make check` is called as a target
+
+### D8: Language→ruleset mapping (required, explicit)
+- Add this mapping to `run_phase03.py`:
+  ```python
+  LANGUAGE_RULESETS = {
+      "python": ["p/python", "p/security-audit"],
+      "javascript": ["p/javascript", "p/security-audit"],
+      "typescript": ["p/typescript", "p/security-audit"],
+      "java": ["p/java", "p/security-audit"],
+      "go": ["p/golang", "p/security-audit"],
+  }
+  DEFAULT_RULESETS = ["p/security-audit"]
+  ```
+
+### D7: Docker network name fix (Codex finding)
+- `docker-compose.yml` MUST include an explicit `name: pentest-net` under the `networks` section
+- Without this, Compose creates `<project>_pentest-net` (e.g. `vuln-flask-app_pentest-net`), not the literal `pentest-net`
+- `run_poc.py --network pentest-net` and `docker network inspect pentest-net` both fail against the prefixed name
+- Fix: add to docker-compose.yml:
+  ```yaml
+  networks:
+    pentest-net:
+      name: pentest-net   # force literal name, no project prefix
+      driver: bridge
+  ```
+
+### D9: Critical implementation details
+- Network name is guaranteed by D7 fix above — no runtime discovery needed
+- `run_poc.py --network` flag requires env-var passthrough: add `--env KEY=VALUE` forwarding to `docker run` invocation
+- Explicit check: if `docker network inspect pentest-net` fails → raise clear error before attempting PoC
+
+### D12: Runtime assertion required
+- E2E test must assert `elapsed < 300` (5-minute success criterion #10):
+  ```python
+  start = time.time()
+  # ... run pipeline ...
+  assert time.time() - start < 300, "Pipeline exceeded 5-minute limit"
+  ```
+- E2E test must use `try/finally` to tear down Docker containers even on failure
 
 ## Success Criteria
 1. `make check` passes (includes stale reference check, contract validation)
 2. `make test` passes with all unit/behavioral tests green
 3. `make test-integration` passes with E2E test green (requires Docker)
 4. `make lint` passes
-5. Zero stale reference tokens in agent-facing files (repo-wide scan)
+5. Zero stale reference tokens — repo-wide scan (not just .agent/)
 6. Pipeline produces audit-quality report from vuln-flask-app fixture
 7. Report main body contains >= 1 confirmed SQLi with: file path, line number, UNION-based PoC output, taint trace, remediation
 8. Inconclusives in appendix, not main report body
 9. False positive in fixture correctly rejected
-10. Total pipeline runtime < 5 minutes on fixture
+10. Total pipeline runtime < 5 minutes on fixture (asserted in E2E test)
 11. Existing tests unchanged and passing
-12. `run_state.json` shows `"simulated": false` for real runs
+12. `run_state.json` shows `"simulated": false` for real runs (required field, not optional)
 
 ## Dependencies
 - Docker + Docker Compose available for PoC sandbox and target lifecycle
@@ -285,3 +363,20 @@ Part 2 (Vertical Slice):
 - Gitleaks 8.18.4 installed
 - Joern server 4.0.0 available (Phase 05)
 - Python 3.11+
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | issues_open (PLAN) | 8 issues, 3 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+
+**OUTSIDE VOICE (Codex gpt-5.4 xhigh):** 13 findings — Docker network literal name bug, D10 scope understatement (new Joern integration required), Phase 02→03 `attack_surface.json` wiring gap, `tool-versions.json` not consumed anywhere, 5-min criterion unengineered for cold CI.
+
+**CROSS-MODEL:** Codex and eng review agree on Docker network issue (5A) and D10 scope. Codex overrides eng review decision 3B — `init_artifact_run.py` standalone use is deferred; Codex argues no justified consumer exists yet. Kept as standalone per user decision but flagged.
+
+**UNRESOLVED:** 0 unresolved decisions.
+
+**VERDICT:** ENG REVIEW issues addressed in Implementation Notes. All cross-model tensions surfaced. Eng review required before ship.
