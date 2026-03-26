@@ -131,24 +131,44 @@ def is_text_file(path: Path) -> bool:
 
 
 def gather_scan_paths() -> list[Path]:
-    """Walk the entire repo and return all scannable files."""
+    """Walk the entire repo and return all scannable files.
+
+    P3 fix: prune excluded directory subtrees before descending into them so
+    rglob never pays traversal cost for large cache/runtime trees (.venv,
+    .devcontainer/state, .opencode/node_modules, etc.).
+    """
     paths: list[Path] = []
     seen: set[Path] = set()
 
-    for path in sorted(REPO_ROOT.rglob("*")):
-        if not path.is_file():
-            continue
-        if is_excluded(path):
-            continue
-        if not is_text_file(path):
-            continue
-        resolved = path.resolve()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        paths.append(path)
+    def _walk(directory: Path) -> None:
+        try:
+            entries = list(directory.iterdir())
+        except PermissionError:
+            return
+        for entry in entries:
+            if entry.is_symlink():
+                # Resolve symlinks only for the file check, not for traversal.
+                real = entry.resolve()
+                if real in seen:
+                    continue
+            if entry.is_dir(follow_symlinks=False):
+                # Prune excluded dirs immediately — never descend.
+                if is_excluded(entry):
+                    continue
+                _walk(entry)
+            elif entry.is_file(follow_symlinks=True):
+                if is_excluded(entry):
+                    continue
+                if not is_text_file(entry):
+                    continue
+                resolved = entry.resolve()
+                if resolved in seen:
+                    continue
+                seen.add(resolved)
+                paths.append(entry)
 
-    return paths
+    _walk(REPO_ROOT)
+    return sorted(paths)
 
 
 def gemini_is_provider_context(line: str) -> bool:

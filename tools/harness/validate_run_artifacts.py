@@ -114,8 +114,16 @@ def main() -> None:
         fail("contract enums are incomplete")
 
     # --- Validate run_state.json ---
+    # P1 fix: run_state.json is required, not optional. A missing file means
+    # the run was never properly initialised and the simulated/real declaration
+    # is absent — fail rather than silently treating the run as real.
     run_state_path = run_root / RUN_STATE_LOCATION
     run_state_present = run_state_path.exists()
+    if not run_state_present:
+        fail(
+            f"run_state.json is required but missing: {run_state_path}\n"
+            "  Initialise the run directory with init_artifact_run.py before validating."
+        )
     run_state: Dict[str, object] = {}
     run_state_run_id: str | None = None
     simulated_run = False

@@ -61,10 +61,21 @@ def main(argv: list[str] | None = None) -> None:
     else:
         output_dir = REPO_ROOT / ".agent/artifacts/runs" / args.run_id
 
-    # Duplicate run-id guard
+    # Duplicate run-id guard — check both the chosen output_dir AND any existing
+    # run directory under the default runs/ tree with the same run-id.
+    # P2 fix: custom --output-dir bypassed the uniqueness guarantee because the
+    # guard only checked whether output_dir already existed. Now also check the
+    # canonical runs/<run-id> path so the same run-id can never appear twice.
+    default_run_dir = REPO_ROOT / ".agent/artifacts/runs" / args.run_id
     if output_dir.exists():
         print(
             f"[init-artifact-run] output directory already exists: {output_dir}",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    if output_dir != default_run_dir and default_run_dir.exists():
+        print(
+            f"[init-artifact-run] run-id '{args.run_id}' already used at: {default_run_dir}",
             file=sys.stderr,
         )
         raise SystemExit(1)
