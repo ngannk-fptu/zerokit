@@ -81,9 +81,16 @@ def main() -> None:
 
     try:
         completed = subprocess.run(command, capture_output=True, text=True, timeout=args.timeout, check=False)
-        status = "confirmed" if completed.returncode == 0 else "rejected"
-        exit_code = completed.returncode
         log_text = format_output(completed.stdout, completed.stderr)
+        # Infrastructure failures (daemon down, permission denied, image pull error) must
+        # not be recorded as rejected — the PoC never ran, so the finding is inconclusive.
+        # Docker exits 125 for daemon/setup errors, 126 for permission errors on the binary,
+        # 127 for command not found. Any of these are environment failures, not PoC failures.
+        if completed.returncode in (125, 126, 127):
+            status = "inconclusive"
+        else:
+            status = "confirmed" if completed.returncode == 0 else "rejected"
+        exit_code = completed.returncode
     except subprocess.TimeoutExpired as exc:
         status = "inconclusive"
         exit_code = 124

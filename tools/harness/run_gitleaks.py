@@ -83,7 +83,7 @@ def extract_findings(report: Any) -> list[dict[str, Any]]:
     return normalized_findings
 
 
-def normalize_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def normalize_findings(findings: list[dict[str, Any]], target: Path) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     for idx, finding in enumerate(findings):
         rule = finding.get("RuleID")
@@ -102,7 +102,10 @@ def normalize_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "tool": "gitleaks",
                 "rule": rule,
                 "severity": "high",
-                "path": path,
+                # Normalize to a path relative to the scan target so artifacts are
+                # portable across machines. Gitleaks emits absolute host paths with
+                # --no-git; relative paths allow hypothesis matching against other tools.
+                "path": str(Path(path).relative_to(target)) if Path(path).is_absolute() and Path(path).is_relative_to(target) else path,
                 "line": line,
                 "evidence": f"Secret detected: {rule}",
                 "cwe": "CWE-798",
@@ -191,7 +194,7 @@ def main() -> None:
     payload = {
         "run_id": args.run_id,
         "generated_at": utc_now_iso(),
-        "items": normalize_findings(findings),
+        "items": normalize_findings(findings, target),
     }
     validate_output(payload, schema)
     write_output(payload, output_path)

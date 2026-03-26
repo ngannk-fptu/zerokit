@@ -23,7 +23,7 @@ TAINT_QUERY = (
     'cpg.method.parameter.evalType(".*(?i)(request|input|user|param|query|body|form|header|cookie|path|url).*")\n'
     '  .reachableBy(cpg.call.name(".*(?i)(exec|eval|system|popen|query|execute|write|send|open|read|load|deserialize|'
     "unserialize|pickle|yaml\\.load|fromstring|innerhtml|"
-    'dangerouslysetinnerhtml).*))")\n'
+    'dangerouslysetinnerhtml).*"))\n'
     "  .l"
 )
 

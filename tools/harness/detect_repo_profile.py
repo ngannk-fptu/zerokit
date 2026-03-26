@@ -210,12 +210,17 @@ def build_test_commands(languages: List[str], target: Path) -> Tuple[List[str], 
 
     for lang in languages:
         build_cmd, test_cmd = BUILD_TEST_HINTS[lang]
-        if lang in ("typescript", "javascript") and not (target / "package.json").exists():
-            continue
-        if lang == "java" and not ((target / "pom.xml").exists() or (target / "build.gradle").exists() or (target / "build.gradle.kts").exists()):
-            continue
-        if lang == "python" and not ((target / "pyproject.toml").exists() or (target / "requirements.txt").exists() or (target / "setup.py").exists()):
-            continue
+        # Check both root and any nested subdirectory — monorepos may have manifests
+        # in nested packages rather than at the repo root.
+        if lang in ("typescript", "javascript"):
+            if not list(target.rglob("package.json")):
+                continue
+        elif lang == "java":
+            if not (list(target.rglob("pom.xml")) or list(target.rglob("build.gradle")) or list(target.rglob("build.gradle.kts"))):
+                continue
+        elif lang == "python":
+            if not (list(target.rglob("pyproject.toml")) or list(target.rglob("requirements.txt")) or list(target.rglob("setup.py"))):
+                continue
         build_commands.append(build_cmd)
         test_commands.append(test_cmd)
 
