@@ -105,7 +105,11 @@ def normalize_findings(findings: list[dict[str, Any]], target: Path) -> list[dic
                 # Normalize to a path relative to the scan target so artifacts are
                 # portable across machines. Gitleaks emits absolute host paths with
                 # --no-git; relative paths allow hypothesis matching against other tools.
-                "path": str(Path(path).relative_to(target)) if Path(path).is_absolute() and Path(path).is_relative_to(target) else path,
+                "path": (
+                    str(Path(path).relative_to(target))
+                    if Path(path).is_absolute() and Path(path).is_relative_to(target)
+                    else path
+                ),
                 "line": line,
                 "evidence": f"Secret detected: {rule}",
                 "cwe": "CWE-798",

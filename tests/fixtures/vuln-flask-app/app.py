@@ -8,7 +8,7 @@ Do NOT deploy to any network accessible outside of local Docker testing.
 import os
 import sqlite3
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
