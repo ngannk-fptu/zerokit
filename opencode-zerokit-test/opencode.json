@@ -1,0 +1,16 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "pentest-lead",
+  "instructions": [
+    "AGENTS.md",
+    ".agent/agent.md",
+    ".agent/HARNESS_SCOPE.md",
+    ".agent/methodology/master-harness.md",
+    ".agent/methodology/phases/*.md"
+  ],
+  "permission": {
+    "skill": {
+      "*": "allow"
+    }
+  }
+}

@@ -32,6 +32,7 @@ obj/
 .vscode/
 .idea/
 .devcontainer/state/
+.devcontainer/opencode/profiles/
 
 # OS files
 .DS_Store
@@ -53,3 +54,7 @@ uv.lock
 
 # Sisyphus planner
 .sisyphus/
+
+# Runtime test artifacts
+opencode-zerokit-test/.runtime/
+test-results/

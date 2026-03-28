@@ -71,11 +71,15 @@ Gitleaks, Bun, OpenCode.
 After the container builds:
 
 ```bash
-# Profile A: develop ZeroKit
-opencode-a
+# Vanilla baseline
+opencode-vanilla
 
-# Profile B: run ZeroKit as a pentester against a target
-opencode-b
+# ZeroKit-enabled runtime
+opencode-zerokit
+
+# Backward-compatible aliases
+# opencode-b == opencode-vanilla
+# opencode-a == opencode-zerokit
 ```
 
 ### Option B: Local install
@@ -98,8 +102,8 @@ make test    # unit tests
 ## Quick Start: Run a Pentest
 
 ```bash
-# 1. Launch Profile B (or point any agent at .agent/agent.md)
-opencode-b
+# 1. Launch the ZeroKit-enabled runtime
+opencode-zerokit
 
 # 2. Tell the agent what to pentest
 > Run a whitebox pentest on tests/fixtures/vuln-flask-app

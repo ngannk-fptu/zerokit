@@ -35,6 +35,8 @@ EXCLUDED_PATH_PREFIXES = [
     ".claude",              # Claude session state
     ".context",             # Context window tracking
     ".agent/artifacts/runs",  # Generated pentest run output (runtime, not source)
+    "opencode-zerokit-test",  # Profile B shadow copy used for testing (runtime, not source)
+    "test-results",           # Test run output directory (runtime, not source)
 ]
 
 # Files allowlisted by name — these legitimately reference forbidden tokens

@@ -2,23 +2,24 @@
 
 This repo includes an isolated DevContainer workflow for testing OpenCode in two clean modes:
 
-- Profile `A`: clean container-local OpenCode plus this repo's `.opencode`
-- Profile `B`: clean container-local OpenCode with no repo-local `.opencode`
+- `zerokit`: clean container-local OpenCode plus this repo's `.opencode`
+- `vanilla`: clean container-local OpenCode with no repo-local `.opencode`
 
 ## Why this exists
 
 - Avoid using your host OpenCode install and host OpenCode state.
-- Keep profile `B` truly vanilla.
-- Let profile `A` add only ZeroKit's repo-local OpenCode integration.
+- Keep `vanilla` truly vanilla.
+- Let `zerokit` add only ZeroKit's repo-local OpenCode integration.
 
 ## Included commands
 
-- `opencode-a`
-- `opencode-b`
-- `opencode-sync a`
-- `opencode-sync b`
-- `opencode-reset a`
-- `opencode-reset b`
+- `opencode-vanilla`
+- `opencode-zerokit`
+- `opencode-sync vanilla`
+- `opencode-sync zerokit`
+- `opencode-reset vanilla`
+- `opencode-reset zerokit`
+- Compatibility aliases: `opencode-a` = `opencode-zerokit`, `opencode-b` = `opencode-vanilla`
 
 ## Important behavior
 
@@ -29,8 +30,8 @@ Because this repo already has a `.opencode/`, launching OpenCode directly in the
 To avoid that, the wrappers create a clean shadow copy of the repo outside the git tree:
 
 - Source repo: `/workspaces/zerokit-dev`
-- Shadow A: `/tmp/zerokit-opencode/projects/a`
-- Shadow B: `/tmp/zerokit-opencode/projects/b`
+- Shadow `zerokit`: `/tmp/zerokit-opencode/projects/zerokit`
+- Shadow `vanilla`: `/tmp/zerokit-opencode/projects/vanilla`
 
 The shadow copy excludes:
 
@@ -45,21 +46,21 @@ The shadow copy excludes:
 - `CONTEXT.md`
 - local caches and build artifacts
 
-## Profile behavior
+## Runtime behavior
 
-### `opencode-a`
+### `opencode-zerokit`
 
-- Rebuilds profile A's clean shadow project
-- Uses isolated state under `.devcontainer/state/a/`
+- Rebuilds the clean `zerokit` shadow project
+- Uses isolated state under `.devcontainer/state/zerokit/`
 - Injects this repo's `.opencode` through `OPENCODE_CONFIG_DIR`
 - Disables external Claude-style skills and prompt loading via env flags
 
 This is the "ZeroKit enabled" run.
 
-### `opencode-b`
+### `opencode-vanilla`
 
-- Rebuilds profile B's clean shadow project
-- Uses isolated state under `.devcontainer/state/b/`
+- Rebuilds the clean `vanilla` shadow project
+- Uses isolated state under `.devcontainer/state/vanilla/`
 - Does **not** inject this repo's `.opencode`
 - Disables external Claude-style skills and prompt loading via env flags
 
@@ -68,15 +69,15 @@ This is the "vanilla OpenCode" run.
 ## Typical usage
 
 1. Start the ZeroKit-enabled side:
-   - `opencode-a`
+   - `opencode-zerokit`
 2. Start the vanilla side:
-   - `opencode-b`
+   - `opencode-vanilla`
 3. If you changed files in the source repo and want a fresh shadow copy:
-   - `opencode-sync a`
-   - `opencode-sync b`
+   - `opencode-sync zerokit`
+   - `opencode-sync vanilla`
 4. If you want to wipe OpenCode state and rebuild from scratch:
-   - `opencode-reset a`
-   - `opencode-reset b`
+   - `opencode-reset zerokit`
+   - `opencode-reset vanilla`
 
 ## Verification
 
@@ -88,22 +89,22 @@ Inside the container:
 
 For wrapper behavior:
 
-- `opencode-a`
-- `opencode-b`
+- `opencode-zerokit`
+- `opencode-vanilla`
 
 ## Troubleshooting
 
-### B still looks customized
+### `vanilla` still looks customized
 
-Reset and rerun profile B:
+Reset and rerun the vanilla runtime:
 
-- `opencode-reset b`
-- `opencode-b`
+- `opencode-reset vanilla`
+- `opencode-vanilla`
 
-### A does not include ZeroKit behavior
+### `zerokit` does not include ZeroKit behavior
 
 Confirm the repo still has `.opencode/`:
 
 - `find .opencode -maxdepth 3 -print`
 
-Profile A injects that directory directly.
+The `zerokit` runtime injects that directory directly.

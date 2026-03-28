@@ -3,6 +3,9 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1.8.0": {}
+  },
   "remoteUser": "vscode",
   "updateRemoteUserUID": true,
   "remoteEnv": {

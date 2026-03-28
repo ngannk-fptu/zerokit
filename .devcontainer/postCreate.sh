@@ -9,14 +9,16 @@ LOCAL_BIN="${HOME}/.local/bin"
 cd "${REPO_ROOT}"
 
 mkdir -p "${LOCAL_BIN}" \
-  "${REPO_ROOT}/.devcontainer/state/a/xdg-config" \
-  "${REPO_ROOT}/.devcontainer/state/a/xdg-data" \
-  "${REPO_ROOT}/.devcontainer/state/a/xdg-cache" \
-  "${REPO_ROOT}/.devcontainer/state/b/xdg-config" \
-  "${REPO_ROOT}/.devcontainer/state/b/xdg-data" \
-  "${REPO_ROOT}/.devcontainer/state/b/xdg-cache"
+  "${REPO_ROOT}/.devcontainer/state/zerokit/xdg-config" \
+  "${REPO_ROOT}/.devcontainer/state/zerokit/xdg-data" \
+  "${REPO_ROOT}/.devcontainer/state/zerokit/xdg-cache" \
+  "${REPO_ROOT}/.devcontainer/state/vanilla/xdg-config" \
+  "${REPO_ROOT}/.devcontainer/state/vanilla/xdg-data" \
+  "${REPO_ROOT}/.devcontainer/state/vanilla/xdg-cache"
 
 ln -sf "${REPO_ROOT}/.devcontainer/bin/opencode-profile" "${LOCAL_BIN}/opencode-profile"
+ln -sf "${REPO_ROOT}/.devcontainer/bin/opencode-vanilla" "${LOCAL_BIN}/opencode-vanilla"
+ln -sf "${REPO_ROOT}/.devcontainer/bin/opencode-zerokit" "${LOCAL_BIN}/opencode-zerokit"
 ln -sf "${REPO_ROOT}/.devcontainer/bin/opencode-a" "${LOCAL_BIN}/opencode-a"
 ln -sf "${REPO_ROOT}/.devcontainer/bin/opencode-b" "${LOCAL_BIN}/opencode-b"
 ln -sf "${REPO_ROOT}/.devcontainer/bin/opencode-sync" "${LOCAL_BIN}/opencode-sync"
